@@ -185,12 +185,32 @@ try {
     Check $print.Current.IsEnabled "'Print…' still enabled after saving"
     Check ((Find-Element $win 'Show in folder' ([System.Windows.Automation.ControlType]::Button)) -ne $null) "'Show in folder' appears after saving"
 
-    # Print dialog opens (then cancel)
+    # Print preview opens, shows every page, then the Windows print dialog opens from it (cancel it)
     Activate-Window $win
     Click-Element $print
-    $pd = Find-Window 'FileRedact - Print' 30 $win
-    Pass "print dialog opened"
+    $pv = Find-Window 'Print preview - FileRedact' 30 $win
+    Pass "print preview window opened"
+    $ready = Wait-Until -Seconds 120 -What 'preview pages to render' {
+        $c = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
+        foreach ($t in $pv.FindAll([System.Windows.Automation.TreeScope]::Descendants, $c)) { if ($t.Current.Name -like 'Ready to print*') { return $t.Current.Name } }
+        $null
+    }
+    Pass "preview rendered: $ready"
+    try {
+        Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+        $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+        $bmp.Save((Join-Path $env:TEMP 'FileRedact-smoke-preview.png'))
+    } catch { }
+    Activate-Window $pv
+    Click-Element (Find-Element $pv 'Print…' ([System.Windows.Automation.ControlType]::Button))
+    $pd = Find-Window 'FileRedact - Print' 30 $pv
+    Pass "print dialog opened from the preview"
     Click-Element (Find-Element $pd 'Cancel' ([System.Windows.Automation.ControlType]::Button))
+    Start-Sleep -Milliseconds 500
+    Click-Element (Find-Element $pv 'Close' ([System.Windows.Automation.ControlType]::Button))
     Start-Sleep -Milliseconds 500
 
     # Update check reports something sensible

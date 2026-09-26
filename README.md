@@ -27,7 +27,8 @@ Print to PDF" works.
   burned into the pixels; only the words that were *not* redacted are written back as an invisible text
   layer so the PDF stays searchable and AI tools can read it without OCR. Nothing from the original
   file (content streams, fonts, metadata, attachments) is copied, so redacted content cannot be recovered.
-- **Output**: save as PDF or print the redacted rendering.
+- **Output**: save as PDF, or print the redacted rendering after a print preview that shows every page
+  exactly as it will come out of the printer.
 - **Virtual printer**: "Install FileRedact printer" adds a printer that routes jobs into FileRedact.
   A small background watcher (notification-area icon) opens each job automatically.
 

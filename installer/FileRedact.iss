@@ -164,6 +164,45 @@ begin
   Result := ExpandConstant('{param:AUTORESTART|0}') = '1';
 end;
 
+// Shortcuts live either in the per-user or the all-users locations depending on how a version was installed.
+// After installing, remove the ones from the other scope (and ours when the task was deselected), so an
+// upgrade never leaves two identical icons on the desktop or in the Start menu.
+procedure RemoveStaleShortcuts;
+var
+  OtherDesktop, OtherGroup, OwnDesktop: String;
+begin
+  if IsAdminInstallMode then
+  begin
+    OtherDesktop := ExpandConstant('{userdesktop}\{#AppName}.lnk');
+    OtherGroup := ExpandConstant('{userprograms}\{#AppName}');
+  end
+  else
+  begin
+    OtherDesktop := ExpandConstant('{commondesktop}\{#AppName}.lnk');
+    OtherGroup := ExpandConstant('{commonprograms}\{#AppName}');
+  end;
+  if FileExists(OtherDesktop) then
+  begin
+    Log('Removing stale desktop shortcut: ' + OtherDesktop);
+    if not DeleteFile(OtherDesktop) then Log('  (could not delete - insufficient rights)');
+  end;
+  if DirExists(OtherGroup) then
+  begin
+    Log('Removing stale Start menu group: ' + OtherGroup);
+    DelTree(OtherGroup, True, True, True);
+  end;
+  if not WizardIsTaskSelected('desktopicon') then
+  begin
+    OwnDesktop := ExpandConstant('{autodesktop}\{#AppName}.lnk');
+    if FileExists(OwnDesktop) then DeleteFile(OwnDesktop);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then RemoveStaleShortcuts;
+end;
+
 function InitializeUninstall(): Boolean;
 begin
   KillRunningApp;

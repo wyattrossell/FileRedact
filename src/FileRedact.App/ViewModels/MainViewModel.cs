@@ -356,8 +356,12 @@ public partial class MainViewModel : ObservableObject
         var accepted = Findings.Where(f => f.Accepted).Select(f => f.Model).ToList();
         try
         {
-            if (PrintService.Print(_document, accepted, BuildRedactionOptions()))
-                Status = "Sent redacted document to the printer.";
+            // Show the pages as they will print (redactions burned in); the preview hands off to the printer dialog.
+            var preview = new PrintPreviewWindow(_document, accepted, BuildRedactionOptions());
+            if (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault(w => ReferenceEquals(w.ViewModel, this) && w.IsVisible) is { } owner)
+                preview.Owner = owner;
+            preview.ShowDialog();
+            if (preview.Printed) Status = "Sent redacted document to the printer.";
         }
         catch (Exception ex)
         {
