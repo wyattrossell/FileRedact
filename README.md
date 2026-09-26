@@ -50,16 +50,20 @@ dotnet publish src/FileRedact.App -c Release -r win-x64 --self-contained false -
 ## Installing
 
 Download `FileRedact-Setup-<version>.exe` from the [releases page](https://github.com/wyattrossell/FileRedact/releases)
-and run it. The installer is self-contained (no separate .NET download) and offers to:
+and run it. The installer is self-contained (no separate .NET download), installs for the current user
+without administrator rights, and offers to:
 
 - create Start menu and desktop shortcuts,
-- install the **FileRedact** virtual printer,
+- install the **FileRedact** virtual printer (this one step asks for administrator approval),
 - start the print watcher when you sign in,
 - add a **Redact with FileRedact** entry to the right-click menu of PDF, Word, text and image files.
 
 Uninstalling from *Settings → Apps* removes the printer, the shortcuts and the context-menu entries, and
 asks whether to delete your settings and received print jobs. A portable `FileRedact-win-x64.zip` is
 also attached to each release for machines where an installer is not wanted.
+
+Version 1.0.0 installed per-machine (Program Files). Newer installers detect that copy, remove it (one
+administrator prompt) and install per-user, so that no later update ever needs administrator approval.
 
 To build the installer yourself, install [Inno Setup 6](https://jrsoftware.org/isinfo.php)
 (`winget install JRSoftware.InnoSetup`) and run:
@@ -86,24 +90,33 @@ Requirements: the "Microsoft Print to PDF" Windows feature must be enabled (it i
 
 ## Updates and releases
 
-FileRedact checks the GitHub Releases page of this repository once a day (and on demand via
-**Check for updates** in the toolbar or the notification-area menu). When a newer release exists, a
-dialog shows the release notes and offers to download the installer (`FileRedact-Setup-<version>.exe`)
-and run it, remind you later, or skip that version. Only the public
-`api.github.com/repos/wyattrossell/FileRedact/releases/latest` endpoint is contacted; no document
-content or personal data is sent. The check can be disabled by setting `"CheckForUpdates": false` in
-`%LocalAppData%\FileRedact\settings.json`.
+Updates are applied by the application itself; users never need to visit GitHub. Once a day (and on
+demand via **Check for updates** in the toolbar or the notification-area menu) FileRedact asks the
+GitHub Releases API for the latest release. When a newer one exists it downloads the installer in the
+background, verifies its size and SHA-256 digest against the release metadata, and shows a single
+question: **Install and restart** or **Not now**. Installing runs the setup silently (no wizard, no
+administrator prompt), keeps the options chosen at installation, and starts FileRedact again when it is
+finished. Only the public `api.github.com/repos/wyattrossell/FileRedact/releases/latest` endpoint and
+the release asset URL are contacted; no document content or personal data is sent. The check can be
+disabled by setting `"CheckForUpdates": false` in `%LocalAppData%\FileRedact\settings.json`.
+
+The complete flow is exercised by `tools\Test-UpdateFlow.ps1`, which installs an old build, serves a fake
+release feed from localhost (`FILEREDACT_UPDATE_URL` overrides the feed URL), triggers the in-app update
+and checks that the new version restarts. `tools\Smoke-Test-UI.ps1` drives the main window through open,
+review, save, print and update-check using UI Automation.
 
 To publish a release, push a version tag; the GitHub Actions workflow builds, tests, publishes a
 self-contained win-x64 build, compiles the installer and attaches both to the release:
 
 ```powershell
-git tag v0.2.0
-git push origin v0.2.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 The application compares its own assembly version (set from the tag by the workflow, or from
-`Directory.Build.props` for local builds) with the release tag.
+`Directory.Build.props` for local builds) with the release tag. Keep `<Version>` in
+`Directory.Build.props` equal to the next release number so development builds do not offer an older
+release as an "update".
 
 ## Project layout
 

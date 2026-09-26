@@ -12,8 +12,20 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\FileRedact.Core\FileRedact.Core.csproj" />
+    <ProjectReference Include="..\..\src\FileRedact.App\FileRedact.App.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
   </ItemGroup>
 
 </Project>

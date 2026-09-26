@@ -311,27 +311,37 @@ public partial class MainViewModel : ObservableObject
         };
         if (dlg.ShowDialog() != true) return;
 
+        if (!await ExportAsync(dlg.FileName)) return;
+        var open = MessageBox.Show(
+            $"Redacted PDF saved with {accepted.Count} item(s) blacked out:\n{dlg.FileName}\n\nOpen it now to check the result?",
+            "FileRedact - saved", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (open == MessageBoxResult.Yes)
+            Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
+    }
+
+    /// <summary>Writes the redacted PDF for the currently selected findings to <paramref name="outputPath"/>.</summary>
+    public async Task<bool> ExportAsync(string outputPath)
+    {
+        if (_document == null) return false;
+        var accepted = Findings.Where(f => f.Accepted).Select(f => f.Model).ToList();
         IsBusy = true;
         try
         {
             var options = BuildRedactionOptions();
             var progress = new Progress<(int Page, int Total)>(p => Status = $"Writing redacted page {p.Page} of {p.Total}…");
             var doc = _document;
-            await Task.Run(() => RedactionWriter.Write(doc, accepted, dlg.FileName, options, progress));
-            Settings.LastOutputFolder = Path.GetDirectoryName(dlg.FileName);
+            await Task.Run(() => RedactionWriter.Write(doc, accepted, outputPath, options, progress));
+            Settings.LastOutputFolder = Path.GetDirectoryName(outputPath);
             SaveSettings();
-            LastOutputPath = dlg.FileName;
-            Status = $"Saved redacted PDF: {dlg.FileName} ({accepted.Count} item(s) removed)";
-            var open = MessageBox.Show(
-                $"Redacted PDF saved with {accepted.Count} item(s) blacked out:\n{dlg.FileName}\n\nOpen it now to check the result?",
-                "FileRedact - saved", MessageBoxButton.YesNo, MessageBoxImage.Information);
-            if (open == MessageBoxResult.Yes)
-                Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
+            LastOutputPath = outputPath;
+            Status = $"Saved redacted PDF: {outputPath} ({accepted.Count} item(s) removed)";
+            return true;
         }
         catch (Exception ex)
         {
             Status = "Failed to save: " + ex.Message;
             MessageBox.Show(ex.Message, "FileRedact - could not save", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
         }
         finally
         {

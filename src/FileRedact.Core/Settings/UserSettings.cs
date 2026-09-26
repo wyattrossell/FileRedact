@@ -14,8 +14,6 @@ public sealed class UserSettings
     public string? LastOutputFolder { get; set; }
     public bool CheckForUpdates { get; set; } = true;
     public DateTime? LastUpdateCheckUtc { get; set; }
-    /// <summary>A release the user chose to skip; no prompt is shown again for this version.</summary>
-    public string? SkippedUpdateVersion { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

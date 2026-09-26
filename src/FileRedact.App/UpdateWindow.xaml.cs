@@ -1,128 +1,94 @@
-using System.Diagnostics;
-using System.IO;
 using System.Windows;
 using FileRedact.Core.Update;
 
 namespace FileRedact.App;
 
-public enum UpdateChoice { Later, Skip, Downloaded, OpenedPage }
-
+/// <summary>
+/// One simple question for the user: install the new version now, or not now. The installer is fetched
+/// automatically (or has already been fetched in the background) and the button stays disabled until the
+/// download has been verified.
+/// </summary>
 public partial class UpdateWindow : Window
 {
     private readonly ReleaseInfo _release;
-    private CancellationTokenSource? _cts;
+    private readonly CancellationTokenSource _cts = new();
+    private string? _downloadedPath;
+    private bool _downloading;
 
-    public UpdateChoice Choice { get; private set; } = UpdateChoice.Later;
+    /// <summary>Set when the user chose to install; the path of the verified installer.</summary>
+    public string? InstallerPath { get; private set; }
 
-    public UpdateWindow(ReleaseInfo release, Version current)
+    public UpdateWindow(ReleaseInfo release, Version current, string? alreadyDownloadedPath)
     {
         InitializeComponent();
         _release = release;
-        Headline.Text = $"FileRedact {release.Version.ToString(3)} is available";
-        var when = release.Published is { } p ? $" Released {p.LocalDateTime:d}." : "";
-        VersionLine.Text = $"You are running version {current.ToString(3)}.{when}";
+        _downloadedPath = alreadyDownloadedPath;
+
+        Headline.Text = $"A new version of FileRedact is ready ({release.Version.ToString(3)})";
+        Detail.Text = $"You have version {current.ToString(3)}. Installing takes about a minute. FileRedact will close, update itself and open again automatically.";
         Notes.Text = string.IsNullOrWhiteSpace(release.Notes) ? "(No release notes were provided.)" : release.Notes.Trim();
-        if (release.AssetUrl == null)
+        NotesExpander.Visibility = string.IsNullOrWhiteSpace(release.Notes) ? Visibility.Collapsed : Visibility.Visible;
+
+        if (_downloadedPath != null)
         {
-            DownloadButton.Content = "Open download page";
+            ProgressText.Text = "The update has been downloaded and checked.";
+            Progress.Value = 1;
+            InstallButton.IsEnabled = true;
         }
         else
         {
-            DownloadButton.Content = UpdateChecker.IsInstaller(release) ? "Download and install" : "Download update";
-            DownloadButton.ToolTip = $"Downloads {release.AssetName} to your Downloads folder";
+            InstallButton.IsEnabled = false;
+            Loaded += async (_, _) => await DownloadAsync();
         }
     }
 
-    private async void Download_Click(object sender, RoutedEventArgs e)
+    private async Task DownloadAsync()
     {
-        if (_release.AssetUrl == null)
-        {
-            OpenPage();
-            Choice = UpdateChoice.OpenedPage;
-            Close();
-            return;
-        }
-
-        DownloadButton.IsEnabled = false;
-        SkipButton.IsEnabled = false;
-        LaterButton.Content = "Cancel";
-        Progress.Visibility = Visibility.Visible;
-        ProgressText.Visibility = Visibility.Visible;
-        ProgressText.Text = $"Downloading {_release.AssetName}…";
-        _cts = new CancellationTokenSource();
+        _downloading = true;
+        ProgressText.Text = "Downloading the update…";
         try
         {
-            var progress = new Progress<double>(v => { Progress.Value = v; ProgressText.Text = $"Downloading {_release.AssetName}… {v:P0}"; });
-            var path = await UpdateChecker.DownloadAssetAsync(_release, progress, _cts.Token);
-            Choice = UpdateChoice.Downloaded;
-            ProgressText.Text = $"Saved to {path}";
-            if (UpdateChecker.IsInstaller(_release))
+            var progress = new Progress<double>(v =>
             {
-                var run = MessageBox.Show(this,
-                    $"The installer was saved to:\n{path}\n\nInstall FileRedact {_release.Version.ToString(3)} now? FileRedact will close and the installer will start.",
-                    "FileRedact update downloaded", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (run == MessageBoxResult.Yes)
-                {
-                    Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-                    Close();
-                    App.Current.ExitApplication();
-                    return;
-                }
-            }
-            else
-            {
-                MessageBox.Show(this,
-                    $"The update was saved to:\n{path}\n\nClose FileRedact, extract the files over your current installation, then start FileRedact again.",
-                    "FileRedact update downloaded", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
-            Close();
+                Progress.Value = v;
+                ProgressText.Text = v >= 1 ? "Checking the download…" : $"Downloading the update… {v:P0}";
+            });
+            _downloadedPath = await UpdateChecker.DownloadAssetAsync(_release, progress, _cts.Token);
+            ProgressText.Text = "The update has been downloaded and checked.";
+            Progress.Value = 1;
+            InstallButton.IsEnabled = true;
         }
         catch (OperationCanceledException)
         {
-            ProgressText.Text = "Download cancelled.";
-            ResetButtons();
+            // window closed
         }
         catch (Exception ex)
         {
-            ProgressText.Text = "Download failed: " + ex.Message;
-            ResetButtons();
+            ProgressText.Text = "The download failed: " + ex.Message + "\nPlease try again later from \"Check for updates\".";
+            Progress.Value = 0;
+        }
+        finally
+        {
+            _downloading = false;
         }
     }
 
-    private void ResetButtons()
+    private void Install_Click(object sender, RoutedEventArgs e)
     {
-        DownloadButton.IsEnabled = true;
-        SkipButton.IsEnabled = true;
-        LaterButton.Content = "Remind me later";
-        Progress.Visibility = Visibility.Collapsed;
-        _cts = null;
+        if (_downloadedPath == null) return;
+        InstallerPath = _downloadedPath;
+        Close();
     }
 
     private void Later_Click(object sender, RoutedEventArgs e)
     {
-        if (_cts != null) { _cts.Cancel(); return; }
-        Choice = UpdateChoice.Later;
+        InstallerPath = null;
         Close();
-    }
-
-    private void Skip_Click(object sender, RoutedEventArgs e)
-    {
-        Choice = UpdateChoice.Skip;
-        Close();
-    }
-
-    private void PageLink_Click(object sender, RoutedEventArgs e) => OpenPage();
-
-    private void OpenPage()
-    {
-        try { Process.Start(new ProcessStartInfo(_release.PageUrl) { UseShellExecute = true }); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "FileRedact", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        _cts?.Cancel();
+        if (_downloading) _cts.Cancel();
         base.OnClosed(e);
     }
 }

@@ -16,9 +16,10 @@
 #define AppPublisher "Wyatt Rossell"
 #define AppURL "https://github.com/wyattrossell/FileRedact"
 #define AppExeName "FileRedact.exe"
+#define AppGuid "7D4E1F0A-9C3B-4B6E-A2F1-5F0C8E2D1B77"
 
 [Setup]
-AppId={{7D4E1F0A-9C3B-4B6E-A2F1-5F0C8E2D1B77}
+AppId={{{#AppGuid}}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
@@ -32,8 +33,10 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
-; Administrator rights are needed to install the virtual printer.
-PrivilegesRequired=admin
+; Per-user install (no UAC prompt for installing or for automatic updates). The printer script elevates
+; itself the one time it is needed. Administrators can still install for everyone with /ALLUSERS.
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=commandline
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
@@ -73,9 +76,8 @@ Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Registry]
-; Start the background watcher at sign-in so printed documents open automatically. Machine-wide (HKLM) because
-; setup runs elevated and the printer itself is machine-wide; the app recognises this entry as "start with Windows".
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FileRedactWatcher"; ValueData: """{app}\{#AppExeName}"" --watch"; Flags: uninsdeletevalue; Tasks: autostart
+; Start the background watcher at sign-in so printed documents open automatically.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FileRedactWatcher"; ValueData: """{app}\{#AppExeName}"" --watch"; Flags: uninsdeletevalue; Tasks: autostart
 ; "Redact with FileRedact" context-menu verb (does not change the default program for these files).
 ; The "image" SystemFileAssociations group covers .png/.jpg/.jpeg/.tif/.tiff/.bmp in one go.
 Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\FileRedact";          ValueType: string; ValueName: ""; ValueData: "Redact with FileRedact"; Flags: uninsdeletekey; Tasks: contextmenu
@@ -98,9 +100,12 @@ Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\image\shell\FileReda
 Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\image\shell\FileRedact\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: contextmenu
 
 [Run]
-; Install the virtual printer (setup already runs elevated, so no extra UAC prompt).
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\Install-FileRedactPrinter.ps1"""; StatusMsg: "Installing the FileRedact printer..."; Flags: runhidden waituntilterminated; Tasks: installprinter
+; Install the virtual printer. The script asks for administrator approval itself (one UAC prompt). Skipped when
+; the printer already exists, so silent upgrades never prompt.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\tools\Install-FileRedactPrinter.ps1"""; StatusMsg: "Installing the FileRedact printer..."; Flags: runhidden waituntilterminated; Tasks: installprinter; Check: NeedPrinterInstall
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
+; Silent self-update started by the app: bring FileRedact back once the files are in place.
+Filename: "{app}\{#AppExeName}"; Flags: nowait; Check: WantAutoRestart
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\Install-FileRedactPrinter.ps1"" -Uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemovePrinter"
@@ -118,10 +123,45 @@ begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExeName} /F /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+// Version 1.0.0 installed per-machine (Program Files, admin). Later versions install per-user so updates
+// never need administrator approval. When an old per-machine copy is found, remove it first (one last UAC
+// prompt) so the user does not end up with two copies.
+procedure MigrateFromPerMachineInstall;
+var
+  UninstallKey, UninstallExe: String;
+  ResultCode: Integer;
+begin
+  if IsAdminInstallMode then Exit;
+  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#AppGuid}}_is1';
+  if RegQueryStringValue(HKEY_LOCAL_MACHINE, UninstallKey, 'UninstallString', UninstallExe) then
+  begin
+    UninstallExe := RemoveQuotes(UninstallExe);
+    if FileExists(UninstallExe) then
+    begin
+      Log('Removing previous per-machine installation: ' + UninstallExe);
+      ShellExec('runas', UninstallExe, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Log('Previous uninstaller exit code: ' + IntToStr(ResultCode));
+    end;
+  end;
+end;
+
 function InitializeSetup(): Boolean;
 begin
   KillRunningApp;
+  MigrateFromPerMachineInstall;
   Result := True;
+end;
+
+// True when the FileRedact printer is not yet installed on this machine.
+function NeedPrinterInstall(): Boolean;
+begin
+  Result := not RegKeyExists(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Control\Print\Printers\{#AppName}');
+end;
+
+// The application passes /AUTORESTART=1 when it runs the installer for a silent self-update.
+function WantAutoRestart(): Boolean;
+begin
+  Result := ExpandConstant('{param:AUTORESTART|0}') = '1';
 end;
 
 function InitializeUninstall(): Boolean;
@@ -132,7 +172,7 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if CurUninstallStep = usPostUninstall then
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
   begin
     // Per-user data (settings, received print jobs) is kept unless the user opts to remove it.
     if MsgBox('Also delete FileRedact settings and received print jobs from your user profile?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then

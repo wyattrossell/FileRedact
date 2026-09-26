@@ -33,9 +33,9 @@ public class UpdateCheckerTests
           "prerelease": false,
           "published_at": "2026-10-01T12:00:00Z",
           "assets": [
-            { "name": "Source.zip", "browser_download_url": "https://example.invalid/source.zip" },
-            { "name": "FileRedact-win-x64.zip", "browser_download_url": "https://example.invalid/FileRedact-win-x64.zip" },
-            { "name": "FileRedact-Setup-0.2.0.exe", "browser_download_url": "https://example.invalid/FileRedact-Setup-0.2.0.exe" }
+            { "name": "Source.zip", "browser_download_url": "https://example.invalid/source.zip", "size": 10 },
+            { "name": "FileRedact-win-x64.zip", "browser_download_url": "https://example.invalid/FileRedact-win-x64.zip", "size": 20 },
+            { "name": "FileRedact-Setup-0.2.0.exe", "browser_download_url": "https://example.invalid/FileRedact-Setup-0.2.0.exe", "size": 12345, "digest": "sha256:ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789" }
           ]
         }
         """;
@@ -49,19 +49,20 @@ public class UpdateCheckerTests
         Assert.Equal("FileRedact 0.2.0", r.Title);
         Assert.Equal("FileRedact-Setup-0.2.0.exe", r.AssetName);
         Assert.Contains("Setup", r.AssetUrl);
-        Assert.True(UpdateChecker.IsInstaller(r));
+        Assert.Equal(12345, r.AssetSize);
+        Assert.Equal("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", r.AssetSha256);
         Assert.NotNull(r.Published);
+        Assert.True(UpdateChecker.IsInstaller(r));
         Assert.True(r.Version > new Version(0, 1, 0, 0));
     }
 
     [Fact]
     public void Zip_is_chosen_when_no_installer_is_attached()
     {
-        // Remove the installer asset from the sample payload (raw-string indentation is stripped, so match loosely).
         var start = SampleJson.IndexOf("{ \"name\": \"FileRedact-Setup", StringComparison.Ordinal);
         var end = SampleJson.IndexOf('}', start) + 1;
         var json = SampleJson.Remove(start, end - start);
-        json = json.Remove(json.LastIndexOf(',', start), 1); // trailing comma left behind
+        json = json.Remove(json.LastIndexOf(',', start), 1);
         var r = UpdateChecker.ParseRelease(json);
         Assert.NotNull(r);
         Assert.Equal("FileRedact-win-x64.zip", r!.AssetName);
@@ -76,9 +77,37 @@ public class UpdateCheckerTests
     }
 
     [Fact]
+    public void Silent_install_arguments_are_unattended_and_restart_the_app()
+    {
+        var args = UpdateChecker.BuildSilentInstallArguments(@"C:\logs\u.log");
+        Assert.Contains("/VERYSILENT", args);
+        Assert.Contains("/SUPPRESSMSGBOXES", args);
+        Assert.Contains("/NORESTART", args);
+        Assert.Contains("/CLOSEAPPLICATIONS", args);
+        Assert.Contains("/AUTORESTART=1", args);
+        Assert.Contains("/LOG=\"C:\\logs\\u.log\"", args);
+    }
+
+    [Fact]
     public void Current_version_matches_the_project_version()
     {
-        // Directory.Build.props sets <Version>; the checker must read it so comparisons are meaningful.
         Assert.True(UpdateChecker.CurrentVersion >= new Version(0, 1, 0, 0));
+    }
+
+    [Fact]
+    public void Feed_url_can_be_overridden_for_testing()
+    {
+        var old = Environment.GetEnvironmentVariable(UpdateChecker.FeedOverrideVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(UpdateChecker.FeedOverrideVariable, "http://localhost:1/latest.json");
+            Assert.Equal("http://localhost:1/latest.json", UpdateChecker.LatestReleaseApiUrl);
+            Environment.SetEnvironmentVariable(UpdateChecker.FeedOverrideVariable, null);
+            Assert.Contains("api.github.com/repos/wyattrossell/FileRedact", UpdateChecker.LatestReleaseApiUrl);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(UpdateChecker.FeedOverrideVariable, old);
+        }
     }
 }

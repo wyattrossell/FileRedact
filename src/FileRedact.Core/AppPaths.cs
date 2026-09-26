@@ -11,7 +11,13 @@ public static class AppPaths
     /// <summary>The "port" of the virtual printer: the Microsoft Print To PDF driver writes the job to this file.</summary>
     public static string PrinterPortFile => Path.Combine(PrinterInbox, "FileRedact-print.pdf");
 
-    public static string UserData => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileRedact");
+    /// <summary>Environment variable that relocates all per-user data (used by automated tests to avoid touching real settings).</summary>
+    public const string DataDirOverrideVariable = "FILEREDACT_DATA_DIR";
+
+    public static string UserData =>
+        Environment.GetEnvironmentVariable(DataDirOverrideVariable) is { Length: > 0 } o
+            ? o
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileRedact");
     public static string Received => Path.Combine(UserData, "Received");
     public static string Work => Path.Combine(UserData, "Work");
     public static string SettingsFile => Path.Combine(UserData, "settings.json");
