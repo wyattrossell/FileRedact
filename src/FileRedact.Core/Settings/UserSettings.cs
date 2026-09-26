@@ -12,12 +12,21 @@ public sealed class UserSettings
     public bool KeepTextLayer { get; set; } = true;
     public bool PropagateNames { get; set; } = true;
     public string? LastOutputFolder { get; set; }
+    public bool CheckForUpdates { get; set; } = true;
+    public DateTime? LastUpdateCheckUtc { get; set; }
+    /// <summary>A release the user chose to skip; no prompt is shown again for this version.</summary>
+    public string? SkippedUpdateVersion { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() },
     };
+
+    private static readonly Lazy<UserSettings> Shared = new(Load);
+
+    /// <summary>The single settings instance shared by the whole process, so no component overwrites another's changes.</summary>
+    public static UserSettings Current => Shared.Value;
 
     public static UserSettings Load()
     {

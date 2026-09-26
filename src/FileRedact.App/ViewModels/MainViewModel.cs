@@ -23,7 +23,7 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
-        Settings = UserSettings.Load();
+        Settings = UserSettings.Current;
         foreach (var t in Settings.CustomTerms) CustomTerms.Add(t);
         foreach (var c in PiiCategoryInfo.All)
             Categories.Add(new CategoryGroupViewModel(c, SetCategory));

@@ -36,6 +36,7 @@
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                     <Button Style="{StaticResource ToolButton}" Content="{Binding PrinterButtonText}" Command="{Binding TogglePrinterCommand}"
                             ToolTip="Adds a 'FileRedact' printer to Windows. Printing to it opens the document here." />
+                    <Button Style="{StaticResource ToolButton}" Content="Check for updates" Click="CheckForUpdates_Click" ToolTip="Look for a newer release on GitHub" />
                     <Button Style="{StaticResource ToolButton}" Content="Help" Click="Help_Click" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">

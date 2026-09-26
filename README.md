@@ -63,6 +63,27 @@ The printer can be removed from the same button, or with `tools/Install-FileReda
 
 Requirements: the "Microsoft Print to PDF" Windows feature must be enabled (it is by default).
 
+## Updates and releases
+
+FileRedact checks the GitHub Releases page of this repository once a day (and on demand via
+**Check for updates** in the toolbar or the notification-area menu). When a newer release exists, a
+dialog shows the release notes and offers to download the `FileRedact-win-x64.zip` asset to your
+Downloads folder, remind you later, or skip that version. Only the public
+`api.github.com/repos/wyattrossell/FileRedact/releases/latest` endpoint is contacted; no document
+content or personal data is sent. The check can be disabled by setting `"CheckForUpdates": false` in
+`%LocalAppData%\FileRedact\settings.json`.
+
+To publish a release, push a version tag; the GitHub Actions workflow builds, tests, publishes a
+self-contained win-x64 build and attaches it to the release:
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The application compares its own assembly version (set from the tag by the workflow, or from
+`Directory.Build.props` for local builds) with the release tag.
+
 ## Project layout
 
 ```
@@ -84,6 +105,7 @@ Key types:
 | `Documents/DocumentConverter` | Normalises Word/text/image input to PDF (Word COM automation or fallback) |
 | `Ocr/WindowsOcr` | Windows.Media.Ocr for pages without a text layer |
 | `Printer/PrinterInstaller`, `Printer/InboxWatcher` | Virtual printer setup and job pickup |
+| `Update/UpdateChecker` | Queries GitHub Releases, compares versions, downloads the release asset |
 
 ## Detection notes and limitations
 

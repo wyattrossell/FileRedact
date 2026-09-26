@@ -13,6 +13,8 @@ public partial class App : Application
     private TrayIcon? _tray;
     private InboxWatcher? _watcher;
 
+    public UpdateService Updates { get; } = new();
+
     public static new App Current => (App)Application.Current;
 
     /// <summary>True while the printer inbox is being watched; closing the last window then hides it instead of exiting.</summary>
@@ -41,10 +43,12 @@ public partial class App : Application
         _tray.OpenFileRequested += () => ShowMainWindow().ViewModel.OpenFileCommand.Execute(null);
         _tray.TogglePrinterRequested += () => ShowMainWindow().ViewModel.TogglePrinterCommand.Execute(null);
         _tray.ToggleStartupRequested += ToggleStartup;
+        _tray.CheckUpdatesRequested += () => _ = Updates.CheckAsync(manual: true, owner: ShowMainWindow());
         _tray.ExitRequested += ExitApplication;
 
         SyncWatcher();
         HandleArguments(e.Args);
+        _ = Updates.CheckOnStartupAsync();
     }
 
     private void HandleArguments(string[] args)

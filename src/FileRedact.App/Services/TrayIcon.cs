@@ -19,6 +19,7 @@ public sealed class TrayIcon : IDisposable
     public event Action? OpenFileRequested;
     public event Action? TogglePrinterRequested;
     public event Action? ToggleStartupRequested;
+    public event Action? CheckUpdatesRequested;
     public event Action? ExitRequested;
 
     public TrayIcon()
@@ -33,9 +34,11 @@ public sealed class TrayIcon : IDisposable
         _printerItem.Click += (_, _) => TogglePrinterRequested?.Invoke();
         _startupItem = new WinForms.ToolStripMenuItem("Start with Windows");
         _startupItem.Click += (_, _) => ToggleStartupRequested?.Invoke();
+        var updates = new WinForms.ToolStripMenuItem("Check for updates…");
+        updates.Click += (_, _) => CheckUpdatesRequested?.Invoke();
         var exit = new WinForms.ToolStripMenuItem("Exit");
         exit.Click += (_, _) => ExitRequested?.Invoke();
-        menu.Items.AddRange(new WinForms.ToolStripItem[] { open, openFile, new WinForms.ToolStripSeparator(), _printerItem, _startupItem, new WinForms.ToolStripSeparator(), exit });
+        menu.Items.AddRange(new WinForms.ToolStripItem[] { open, openFile, new WinForms.ToolStripSeparator(), _printerItem, _startupItem, new WinForms.ToolStripSeparator(), updates, exit });
 
         _icon = new WinForms.NotifyIcon
         {

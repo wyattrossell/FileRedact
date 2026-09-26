@@ -210,6 +210,9 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+        => await App.Current.Updates.CheckAsync(manual: true, owner: this);
+
     private void Help_Click(object sender, RoutedEventArgs e)
         => MessageBox.Show(this, ViewModel.HelpText, "FileRedact help", MessageBoxButton.OK, MessageBoxImage.Information);
 
