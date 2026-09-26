@@ -111,7 +111,12 @@ public partial class App : Application
 
     private void ToggleStartup()
     {
-        if (PrinterInstaller.IsWatcherRegisteredAtLogin()) PrinterInstaller.UnregisterWatcherAtLogin();
+        if (PrinterInstaller.IsWatcherRegisteredMachineWide())
+        {
+            MessageBox.Show("The FileRedact print watcher was set to start with Windows for all users by the installer. To change that, reinstall FileRedact without the \"start when you sign in\" option.",
+                "FileRedact", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else if (PrinterInstaller.IsWatcherRegisteredAtLogin()) PrinterInstaller.UnregisterWatcherAtLogin();
         else PrinterInstaller.RegisterWatcherAtLogin(Environment.ProcessPath ?? "FileRedact.exe");
         _tray?.SetState(PrinterInstaller.IsInstalled(), PrinterInstaller.IsWatcherRegisteredAtLogin());
     }

@@ -47,6 +47,27 @@ To produce a distributable folder:
 dotnet publish src/FileRedact.App -c Release -r win-x64 --self-contained false -o publish
 ```
 
+## Installing
+
+Download `FileRedact-Setup-<version>.exe` from the [releases page](https://github.com/wyattrossell/FileRedact/releases)
+and run it. The installer is self-contained (no separate .NET download) and offers to:
+
+- create Start menu and desktop shortcuts,
+- install the **FileRedact** virtual printer,
+- start the print watcher when you sign in,
+- add a **Redact with FileRedact** entry to the right-click menu of PDF, Word, text and image files.
+
+Uninstalling from *Settings → Apps* removes the printer, the shortcuts and the context-menu entries, and
+asks whether to delete your settings and received print jobs. A portable `FileRedact-win-x64.zip` is
+also attached to each release for machines where an installer is not wanted.
+
+To build the installer yourself, install [Inno Setup 6](https://jrsoftware.org/isinfo.php)
+(`winget install JRSoftware.InnoSetup`) and run:
+
+```powershell
+.\installer\build-installer.ps1    # publishes win-x64 and writes publish\FileRedact-Setup-<version>.exe
+```
+
 ## Using the virtual printer
 
 1. Start FileRedact and click **Install FileRedact printer** (Windows asks for administrator approval).
@@ -67,14 +88,14 @@ Requirements: the "Microsoft Print to PDF" Windows feature must be enabled (it i
 
 FileRedact checks the GitHub Releases page of this repository once a day (and on demand via
 **Check for updates** in the toolbar or the notification-area menu). When a newer release exists, a
-dialog shows the release notes and offers to download the `FileRedact-win-x64.zip` asset to your
-Downloads folder, remind you later, or skip that version. Only the public
+dialog shows the release notes and offers to download the installer (`FileRedact-Setup-<version>.exe`)
+and run it, remind you later, or skip that version. Only the public
 `api.github.com/repos/wyattrossell/FileRedact/releases/latest` endpoint is contacted; no document
 content or personal data is sent. The check can be disabled by setting `"CheckForUpdates": false` in
 `%LocalAppData%\FileRedact\settings.json`.
 
 To publish a release, push a version tag; the GitHub Actions workflow builds, tests, publishes a
-self-contained win-x64 build and attaches it to the release:
+self-contained win-x64 build, compiles the installer and attaches both to the release:
 
 ```powershell
 git tag v0.2.0
@@ -90,6 +111,7 @@ The application compares its own assembly version (set from the tag by the workf
 src/FileRedact.Core     Detection engine, PDF text extraction, OCR, redaction writer, printer setup
 src/FileRedact.App      WPF user interface, tray icon, single-instance handling, printing
 tests/FileRedact.Tests  Detector unit tests and an end-to-end redaction test
+installer/              Inno Setup script and build script for FileRedact-Setup-<version>.exe
 tools/                  Stand-alone PowerShell script to install/remove the printer
 samples/                A fictitious incident report for trying the application
 ```

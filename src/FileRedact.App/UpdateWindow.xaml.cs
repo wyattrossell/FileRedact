@@ -28,6 +28,7 @@ public partial class UpdateWindow : Window
         }
         else
         {
+            DownloadButton.Content = UpdateChecker.IsInstaller(release) ? "Download and install" : "Download update";
             DownloadButton.ToolTip = $"Downloads {release.AssetName} to your Downloads folder";
         }
     }
@@ -55,9 +56,25 @@ public partial class UpdateWindow : Window
             var path = await UpdateChecker.DownloadAssetAsync(_release, progress, _cts.Token);
             Choice = UpdateChoice.Downloaded;
             ProgressText.Text = $"Saved to {path}";
-            MessageBox.Show(this,
-                $"The update was saved to:\n{path}\n\nClose FileRedact, extract the files over your current installation (or run the installer), then start FileRedact again.",
-                "FileRedact update downloaded", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (UpdateChecker.IsInstaller(_release))
+            {
+                var run = MessageBox.Show(this,
+                    $"The installer was saved to:\n{path}\n\nInstall FileRedact {_release.Version.ToString(3)} now? FileRedact will close and the installer will start.",
+                    "FileRedact update downloaded", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (run == MessageBoxResult.Yes)
+                {
+                    Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                    Close();
+                    App.Current.ExitApplication();
+                    return;
+                }
+            }
+            else
+            {
+                MessageBox.Show(this,
+                    $"The update was saved to:\n{path}\n\nClose FileRedact, extract the files over your current installation, then start FileRedact again.",
+                    "FileRedact update downloaded", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
             try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
             Close();
         }

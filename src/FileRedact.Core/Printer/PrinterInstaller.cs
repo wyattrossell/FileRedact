@@ -27,10 +27,34 @@ public static class PrinterInstaller
         }
     }
 
+    /// <summary>True when the watcher starts at sign-in, either per user (set by the app) or machine-wide (set by the installer).</summary>
     public static bool IsWatcherRegisteredAtLogin()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-        return key?.GetValue(RunKeyName) is string;
+        using var user = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+        if (user?.GetValue(RunKeyName) is string) return true;
+        try
+        {
+            using var machine = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            return machine?.GetValue(RunKeyName) is string;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>True when the installer registered the watcher machine-wide (removing it then needs the uninstaller or an admin).</summary>
+    public static bool IsWatcherRegisteredMachineWide()
+    {
+        try
+        {
+            using var machine = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            return machine?.GetValue(RunKeyName) is string;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static void RegisterWatcherAtLogin(string exePath)

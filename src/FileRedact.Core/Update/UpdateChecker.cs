@@ -82,15 +82,11 @@ public static class UpdateChecker
         string? assetName = null, assetUrl = null;
         if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
         {
-            // Prefer a Windows zip/installer; otherwise the first asset.
+            // Prefer the installer, then a Windows zip, then anything else.
             JsonElement? best = null;
             foreach (var a in assets.EnumerateArray())
             {
-                var name = a.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "";
-                var lower = name.ToLowerInvariant();
-                var score = lower.Contains("win") && (lower.EndsWith(".zip") || lower.EndsWith(".msi") || lower.EndsWith(".exe")) ? 2
-                          : lower.EndsWith(".zip") || lower.EndsWith(".msi") || lower.EndsWith(".exe") ? 1 : 0;
-                if (best == null || score > Score(best.Value)) best = a;
+                if (best == null || AssetScore(a) > AssetScore(best.Value)) best = a;
             }
             if (best != null)
             {
@@ -100,14 +96,21 @@ public static class UpdateChecker
         }
 
         return new ReleaseInfo(version, tag, string.IsNullOrWhiteSpace(title) ? tag : title, notes, page, assetName, assetUrl, published);
-
-        static int Score(JsonElement a)
-        {
-            var lower = (a.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "").ToLowerInvariant();
-            return lower.Contains("win") && (lower.EndsWith(".zip") || lower.EndsWith(".msi") || lower.EndsWith(".exe")) ? 2
-                 : lower.EndsWith(".zip") || lower.EndsWith(".msi") || lower.EndsWith(".exe") ? 1 : 0;
-        }
     }
+
+    private static int AssetScore(JsonElement a)
+    {
+        var lower = (a.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "").ToLowerInvariant();
+        if (lower.EndsWith(".exe") && (lower.Contains("setup") || lower.Contains("install"))) return 4;
+        if (lower.EndsWith(".msi")) return 3;
+        if (lower.EndsWith(".zip") && lower.Contains("win")) return 2;
+        if (lower.EndsWith(".zip") || lower.EndsWith(".exe")) return 1;
+        return 0;
+    }
+
+    /// <summary>True when the release asset is an installer that can simply be run.</summary>
+    public static bool IsInstaller(ReleaseInfo r)
+        => r.AssetName != null && (r.AssetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || r.AssetName.EndsWith(".msi", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Accepts tags such as "v1.2.3", "1.2", "release-1.2.3.4".</summary>
     public static Version? ParseVersion(string tag)

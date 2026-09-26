@@ -34,22 +34,38 @@ public class UpdateCheckerTests
           "published_at": "2026-10-01T12:00:00Z",
           "assets": [
             { "name": "Source.zip", "browser_download_url": "https://example.invalid/source.zip" },
-            { "name": "FileRedact-win-x64.zip", "browser_download_url": "https://example.invalid/FileRedact-win-x64.zip" }
+            { "name": "FileRedact-win-x64.zip", "browser_download_url": "https://example.invalid/FileRedact-win-x64.zip" },
+            { "name": "FileRedact-Setup-0.2.0.exe", "browser_download_url": "https://example.invalid/FileRedact-Setup-0.2.0.exe" }
           ]
         }
         """;
 
     [Fact]
-    public void Release_json_is_parsed_and_windows_asset_preferred()
+    public void Release_json_is_parsed_and_installer_asset_preferred()
     {
         var r = UpdateChecker.ParseRelease(SampleJson);
         Assert.NotNull(r);
         Assert.Equal(new Version(0, 2, 0, 0), r!.Version);
         Assert.Equal("FileRedact 0.2.0", r.Title);
-        Assert.Equal("FileRedact-win-x64.zip", r.AssetName);
-        Assert.Contains("win-x64", r.AssetUrl);
+        Assert.Equal("FileRedact-Setup-0.2.0.exe", r.AssetName);
+        Assert.Contains("Setup", r.AssetUrl);
+        Assert.True(UpdateChecker.IsInstaller(r));
         Assert.NotNull(r.Published);
         Assert.True(r.Version > new Version(0, 1, 0, 0));
+    }
+
+    [Fact]
+    public void Zip_is_chosen_when_no_installer_is_attached()
+    {
+        // Remove the installer asset from the sample payload (raw-string indentation is stripped, so match loosely).
+        var start = SampleJson.IndexOf("{ \"name\": \"FileRedact-Setup", StringComparison.Ordinal);
+        var end = SampleJson.IndexOf('}', start) + 1;
+        var json = SampleJson.Remove(start, end - start);
+        json = json.Remove(json.LastIndexOf(',', start), 1); // trailing comma left behind
+        var r = UpdateChecker.ParseRelease(json);
+        Assert.NotNull(r);
+        Assert.Equal("FileRedact-win-x64.zip", r!.AssetName);
+        Assert.False(UpdateChecker.IsInstaller(r));
     }
 
     [Fact]
