@@ -20,9 +20,12 @@ Print to PDF" works.
   street and PO Box addresses, phone numbers, email addresses, financial account and payment card numbers,
   vehicle identification numbers and plates, criminal-justice identifiers (FBI/UCN, SID, booking, inmate
   and offender numbers), place of birth, mother's maiden name, IP addresses, plus user-defined terms.
-- **Review workflow**: findings are highlighted on the rendered pages and listed by category. Tick or
-  untick items, click highlights to toggle them, drag on a page to redact an arbitrary area, right-click to
-  redact every occurrence of a value, and preview the result as black boxes before committing.
+- **Review workflow**: findings are highlighted on the rendered pages and listed by category, with
+  identical values merged into one row ("Rossell ×50 · 20 pages") whose single checkbox selects or clears
+  every occurrence; expand the row to handle occurrences individually. Click highlights to toggle them,
+  drag across several highlights to redact or un-redact them together, drag over plain text to redact an
+  area, right-click to redact every occurrence of a value, and preview the result as black boxes before
+  committing.
 - **True redaction**: the output PDF is rebuilt from scratch. Every page is rasterised with the black boxes
   burned into the pixels; only the words that were *not* redacted are written back as an invisible text
   layer so the PDF stays searchable and AI tools can read it without OCR. Nothing from the original

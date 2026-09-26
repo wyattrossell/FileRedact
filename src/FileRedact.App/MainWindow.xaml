@@ -12,7 +12,7 @@
         Background="#F9FAFB"
         d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
     <Window.Resources>
-        <CollectionViewSource x:Key="FindingsView" Source="{Binding Findings}">
+        <CollectionViewSource x:Key="GroupsView" Source="{Binding Groups}">
             <CollectionViewSource.GroupDescriptions>
                 <PropertyGroupDescription PropertyName="CategoryName" />
             </CollectionViewSource.GroupDescriptions>
@@ -145,131 +145,147 @@
 
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#E5E7EB" />
 
-            <!-- Review panel -->
-            <Grid Grid.Column="2" Background="White">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+            <!-- Review panel: one scrollbar on the far right scrolls everything (categories, terms, findings, options). -->
+            <ScrollViewer Grid.Column="2" Background="White" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,0,12">
+                    <StackPanel Margin="12,10,12,0">
+                        <TextBlock Text="{Binding DocumentName, FallbackValue='No document'}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding SourcePath}" />
+                        <TextBlock Text="Tick the items to black out. Click a highlight on the page to toggle it; drag across the page to select several at once or to redact an area." Foreground="#6B7280" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
+                    </StackPanel>
 
-                <StackPanel Grid.Row="0" Margin="12,10,12,0">
-                    <TextBlock Text="{Binding DocumentName, FallbackValue='No document'}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding SourcePath}" />
-                    <TextBlock Text="Tick the items to black out. Click a highlight on the page to toggle it; drag on the page to redact an area." Foreground="#6B7280" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
-                </StackPanel>
-
-                <Expander Grid.Row="1" Header="Categories" IsExpanded="True" Margin="12,8,12,0">
-                    <ItemsControl ItemsSource="{Binding Categories}" Margin="4,4,0,0">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:CategoryGroupViewModel}">
-                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsThreeState="False" Margin="0,2"
-                                          Visibility="{Binding Count, Converter={StaticResource NullToCollapsed}}">
-                                    <CheckBox.Style>
-                                        <Style TargetType="CheckBox">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Count}" Value="0">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </CheckBox.Style>
-                                </CheckBox>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Expander>
-
-                <Expander Grid.Row="2" Header="Always redact these terms" IsExpanded="True" Margin="12,8,12,0"
-                          ToolTip="Words or numbers to redact in this and every future document (e.g. a specific name or case number).">
-                    <StackPanel Margin="4,4,0,0">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCustomTermCommand}" Padding="10,2" Margin="4,0,0,0" />
-                            <TextBox Text="{Binding CustomTermInput, UpdateSourceTrigger=PropertyChanged}" KeyDown="CustomTerm_KeyDown" />
-                        </DockPanel>
-                        <ItemsControl ItemsSource="{Binding CustomTerms}" Margin="0,4,0,0" MaxHeight="110">
-                            <ItemsControl.Template>
-                                <ControlTemplate TargetType="ItemsControl">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <ItemsPresenter />
-                                    </ScrollViewer>
-                                </ControlTemplate>
-                            </ItemsControl.Template>
+                    <Expander Header="Categories" IsExpanded="True" Margin="12,8,12,0">
+                        <ItemsControl ItemsSource="{Binding Categories}" Margin="4,4,0,0">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="0,1">
-                                        <Button DockPanel.Dock="Right" Content="✕" Padding="4,0" FontSize="10" BorderThickness="0" Background="Transparent"
-                                                Command="{Binding DataContext.RemoveCustomTermCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="Remove term" />
-                                        <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
-                                    </DockPanel>
+                                <DataTemplate DataType="{x:Type vm:CategoryGroupViewModel}">
+                                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsThreeState="False" Margin="0,2">
+                                        <CheckBox.Style>
+                                            <Style TargetType="CheckBox">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Count}" Value="0">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </CheckBox.Style>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Expander>
+
+                    <Expander Header="Always redact these terms" IsExpanded="True" Margin="12,8,12,0"
+                              ToolTip="Words or numbers to redact in this and every future document (e.g. a specific name or case number).">
+                        <StackPanel Margin="4,4,0,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCustomTermCommand}" Padding="10,2" Margin="4,0,0,0" />
+                                <TextBox Text="{Binding CustomTermInput, UpdateSourceTrigger=PropertyChanged}" KeyDown="CustomTerm_KeyDown" />
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding CustomTerms}" Margin="0,4,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,1">
+                                            <Button DockPanel.Dock="Right" Content="✕" Padding="4,0" FontSize="10" BorderThickness="0" Background="Transparent"
+                                                    Command="{Binding DataContext.RemoveCustomTermCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="Remove term" />
+                                            <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Expander>
+
+                    <StackPanel Margin="12,8,12,0">
+                        <DockPanel Margin="0,0,0,4">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" Foreground="#6B7280" FontSize="11" VerticalAlignment="Bottom" />
+                            <TextBlock Text="Findings" Style="{StaticResource SectionHeader}" Margin="0" />
+                        </DockPanel>
+                        <TextBlock Text="Identical values are grouped: one tick blacks out every occurrence. Click a row to jump to it, ▸ to list each occurrence." Foreground="#6B7280" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4" />
+
+                        <!-- Grouped findings: one row per distinct value, grouped under category headers. -->
+                        <ItemsControl x:Name="GroupsList" ItemsSource="{Binding Source={StaticResource GroupsView}}">
+                            <ItemsControl.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F3F4F6" Padding="6,3" Margin="0,6,0,2">
+                                                <TextBlock FontWeight="SemiBold" Foreground="#374151">
+                                                    <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" (" /><Run Text="{Binding ItemCount, Mode=OneWay}" /><Run Text=")" />
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ItemsControl.GroupStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:FindingGroupViewModel}">
+                                    <StackPanel Margin="0,1">
+                                        <DockPanel ToolTip="{Binding ToolTip}" Background="Transparent" MouseLeftButtonUp="Group_Click">
+                                            <DockPanel.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Redact every occurrence" Click="GroupRedactAll_Click" />
+                                                    <MenuItem Header="Do not redact any occurrence" Click="GroupRedactNone_Click" />
+                                                    <Separator />
+                                                    <MenuItem Header="Always redact this value (this and future documents)"
+                                                              Command="{Binding DataContext.AlwaysRedactGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                                    <MenuItem Header="Remove these findings"
+                                                              Command="{Binding DataContext.RemoveGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                                </ContextMenu>
+                                            </DockPanel.ContextMenu>
+                                            <CheckBox IsChecked="{Binding IsChecked}" IsThreeState="True" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                      ToolTip="Tick to black out every occurrence, untick to keep them all" />
+                                            <Border DockPanel.Dock="Left" Width="4" Margin="0,2,6,2" CornerRadius="2" Background="{Binding Category, Converter={StaticResource CategoryBrush}}" />
+                                            <ToggleButton DockPanel.Dock="Right" IsChecked="{Binding IsExpanded}" Width="20" Height="20" Padding="0" BorderThickness="0" Background="Transparent"
+                                                          ToolTip="Show each occurrence" Margin="4,0,0,0">
+                                                <ToggleButton.Style>
+                                                    <Style TargetType="ToggleButton">
+                                                        <Setter Property="Content" Value="▸" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                                <Setter Property="Content" Value="▾" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Count}" Value="1">
+                                                                <Setter Property="Visibility" Value="Hidden" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ToggleButton.Style>
+                                            </ToggleButton>
+                                            <TextBlock DockPanel.Dock="Right" Foreground="#6B7280" FontSize="11" VerticalAlignment="Center" Margin="6,0,0,0" Text="{Binding Summary}" />
+                                            <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Cursor="Hand" />
+                                        </DockPanel>
+                                        <ItemsControl ItemsSource="{Binding Items}" Margin="28,0,0,2"
+                                                      Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisible}}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type vm:FindingViewModel}">
+                                                    <DockPanel Margin="0,1" ToolTip="{Binding ToolTip}" Background="Transparent" MouseLeftButtonUp="Occurrence_Click">
+                                                        <CheckBox IsChecked="{Binding Accepted}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                        <TextBlock DockPanel.Dock="Right" Foreground="#6B7280" FontSize="11" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                            <Run Text="p." /><Run Text="{Binding Page, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding Reason}" Foreground="#4B5563" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Cursor="Hand" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
-                </Expander>
 
-                <DockPanel Grid.Row="3" Margin="12,8,12,0">
-                    <TextBlock DockPanel.Dock="Top" Text="Findings" Style="{StaticResource SectionHeader}" Margin="0,0,0,4" />
-                    <ListBox x:Name="FindingsList" ItemsSource="{Binding Source={StaticResource FindingsView}}" SelectedItem="{Binding SelectedFinding}"
-                             BorderBrush="#E5E7EB" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.IsVirtualizingWhenGrouping="True">
-                        <ListBox.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.HeaderTemplate>
-                                    <DataTemplate>
-                                        <Border Background="#F3F4F6" Padding="6,3" Margin="0,4,0,2">
-                                            <TextBlock FontWeight="SemiBold" Foreground="#374151">
-                                                <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" (" /><Run Text="{Binding ItemCount, Mode=OneWay}" /><Run Text=")" />
-                                            </TextBlock>
-                                        </Border>
-                                    </DataTemplate>
-                                </GroupStyle.HeaderTemplate>
-                            </GroupStyle>
-                        </ListBox.GroupStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:FindingViewModel}">
-                                <DockPanel ToolTip="{Binding ToolTip}">
-                                    <DockPanel.ContextMenu>
-                                        <ContextMenu>
-                                            <MenuItem Header="Redact all occurrences of this text"
-                                                      Command="{Binding PlacementTarget.Tag.RedactAllOccurrencesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                      CommandParameter="{Binding}" />
-                                            <MenuItem Header="Remove this finding"
-                                                      Command="{Binding PlacementTarget.Tag.RemoveFindingCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                      CommandParameter="{Binding}" />
-                                        </ContextMenu>
-                                    </DockPanel.ContextMenu>
-                                    <CheckBox IsChecked="{Binding Accepted}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                    <Border DockPanel.Dock="Left" Width="4" Margin="0,2,6,2" CornerRadius="2" Background="{Binding Category, Converter={StaticResource CategoryBrush}}" />
-                                    <TextBlock DockPanel.Dock="Right" Foreground="#6B7280" FontSize="11" VerticalAlignment="Center" Margin="6,0,0,0">
-                                        <Run Text="p." /><Run Text="{Binding Page, Mode=OneWay}" />
-                                    </TextBlock>
-                                    <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                </DockPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="4,2" />
-                                <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}" />
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
-                </DockPanel>
-
-                <Expander Grid.Row="4" Header="Output options" Margin="12,8,12,10">
-                    <StackPanel Margin="4,4,0,0">
-                        <CheckBox Content="Keep searchable text for the words that remain" IsChecked="{Binding KeepTextLayer}"
-                                  ToolTip="Adds an invisible text layer with the non-redacted words so the PDF stays searchable and AI tools can read it without OCR. Redacted words are never written." />
-                        <DockPanel Margin="0,6,0,0">
-                            <TextBlock Text="Output resolution (DPI):" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ComboBox ItemsSource="{Binding DpiChoices}" SelectedItem="{Binding OutputDpi}" Width="80" HorizontalAlignment="Left" />
-                        </DockPanel>
-                        <TextBlock Text="Pages are rebuilt as images with the black boxes burned in, so redacted content cannot be recovered from the file." Foreground="#6B7280" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
-                    </StackPanel>
-                </Expander>
-            </Grid>
+                    <Expander Header="Output options" Margin="12,12,12,0" IsExpanded="True">
+                        <StackPanel Margin="4,4,0,0">
+                            <CheckBox Content="Keep searchable text for the words that remain" IsChecked="{Binding KeepTextLayer}"
+                                      ToolTip="Adds an invisible text layer with the non-redacted words so the PDF stays searchable and AI tools can read it without OCR. Redacted words are never written." />
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock Text="Output resolution (DPI):" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding DpiChoices}" SelectedItem="{Binding OutputDpi}" Width="80" HorizontalAlignment="Left" />
+                            </DockPanel>
+                            <TextBlock Text="Pages are rebuilt as images with the black boxes burned in, so redacted content cannot be recovered from the file." Foreground="#6B7280" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </DockPanel>
 </Window>

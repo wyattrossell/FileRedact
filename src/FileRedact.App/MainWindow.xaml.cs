@@ -163,7 +163,7 @@ public partial class MainWindow : Window
             var r = Normalise(_dragStart, pos, canvas);
             _dragRect = null;
             if (r.Width >= ClickTolerance && r.Height >= ClickTolerance)
-                ViewModel.AddManualFinding(page, page.ToPagePoints(r.X, r.Y, r.Width, r.Height));
+                HandleDragSelection(page, r);
         }
         else if (_pressedHighlight != null)
         {
@@ -183,9 +183,74 @@ public partial class MainWindow : Window
         menu.Items.Add(new MenuItem { Header = $"Redact all occurrences of \"{Shorten(f.Text)}\"", Command = ViewModel.RedactAllOccurrencesCommand, CommandParameter = f });
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "Remove this finding", Command = ViewModel.RemoveFindingCommand, CommandParameter = f });
-        menu.Items.Add(new MenuItem { Header = "Show in list", Command = new RelayAction(() => { ViewModel.SelectedFinding = f; FindingsList.ScrollIntoView(f); }) });
+        menu.Items.Add(new MenuItem { Header = "Show in list", Command = new RelayAction(() => ShowInList(f)) });
         menu.IsOpen = true;
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// A drag over existing highlights offers to redact or un-redact all of them at once; a drag over plain
+    /// text redacts that area.
+    /// </summary>
+    private void HandleDragSelection(PageViewModel page, Rect selection)
+    {
+        var hits = page.Highlights
+            .Where(h => selection.IntersectsWith(new Rect(h.X, h.Y, h.Width, h.Height)))
+            .Select(h => h.Finding)
+            .Distinct()
+            .ToList();
+        var area = page.ToPagePoints(selection.X, selection.Y, selection.Width, selection.Height);
+
+        if (hits.Count == 0)
+        {
+            ViewModel.AddManualFinding(page, area);
+            return;
+        }
+
+        var selected = hits.Count(f => f.Accepted);
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem { Header = $"Redact the {hits.Count} selected item(s)", FontWeight = FontWeights.SemiBold, Command = new RelayAction(() => ViewModel.SetAccepted(hits, true)) });
+        menu.Items.Add(new MenuItem { Header = $"Do not redact the {hits.Count} selected item(s)", Command = new RelayAction(() => ViewModel.SetAccepted(hits, false)) });
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = "Redact the whole selected area", Command = new RelayAction(() => ViewModel.AddManualFinding(page, area)) });
+        menu.Items.Add(new MenuItem { Header = $"Remove the {hits.Count} selected finding(s) from the list", Command = new RelayAction(() => ViewModel.RemoveFindings(hits)) });
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = $"({selected} of {hits.Count} currently selected for redaction)", IsEnabled = false });
+        menu.IsOpen = true;
+    }
+
+    // ------------------------------------------------------------ findings panel (grouped rows)
+
+    private void Group_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is CheckBox or System.Windows.Controls.Primitives.ToggleButton) return;
+        if ((sender as FrameworkElement)?.DataContext is FindingGroupViewModel g)
+            ViewModel.ShowFinding(g.First);
+    }
+
+    private void Occurrence_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is CheckBox) return;
+        if ((sender as FrameworkElement)?.DataContext is FindingViewModel f)
+            ViewModel.ShowFinding(f);
+    }
+
+    private static FindingGroupViewModel? GroupOf(object sender)
+        => ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget is FrameworkElement fe ? fe.DataContext as FindingGroupViewModel : null;
+
+    private void GroupRedactAll_Click(object sender, RoutedEventArgs e) { if (GroupOf(sender) is { } g) g.IsChecked = true; }
+    private void GroupRedactNone_Click(object sender, RoutedEventArgs e) { if (GroupOf(sender) is { } g) g.IsChecked = false; }
+
+    private void ShowInList(FindingViewModel f)
+    {
+        var group = ViewModel.Groups.FirstOrDefault(g => g.Items.Contains(f));
+        if (group == null) return;
+        if (group.Count > 1) group.IsExpanded = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (GroupsList.ItemContainerGenerator.ContainerFromItem(group) is FrameworkElement container)
+                container.BringIntoView();
+        }, DispatcherPriority.Loaded);
     }
 
     private static string Shorten(string s) => s.Length > 40 ? s[..37] + "…" : s;

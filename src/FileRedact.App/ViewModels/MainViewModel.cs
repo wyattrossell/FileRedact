@@ -36,6 +36,8 @@ public partial class MainViewModel : ObservableObject
 
     public ObservableCollection<PageViewModel> Pages { get; } = new();
     public ObservableCollection<FindingViewModel> Findings { get; } = new();
+    /// <summary>Findings merged by identical text, one row per distinct value.</summary>
+    public ObservableCollection<FindingGroupViewModel> Groups { get; } = new();
     public ObservableCollection<CategoryGroupViewModel> Categories { get; } = new();
     public ObservableCollection<string> CustomTerms { get; } = new();
 
@@ -159,7 +161,21 @@ public partial class MainViewModel : ObservableObject
     private void RefreshHighlights()
     {
         foreach (var p in Pages) p.RebuildHighlights(Findings);
+        RebuildGroups();
         UpdateSummary();
+    }
+
+    private void RebuildGroups()
+    {
+        var expanded = Groups.Where(g => g.IsExpanded).Select(g => g.Key).ToHashSet();
+        Groups.Clear();
+        foreach (var g in Findings.GroupBy(FindingGroupViewModel.KeyFor)
+                     .Select(g => new FindingGroupViewModel(g.Key, g))
+                     .OrderBy(g => g.CategoryName).ThenByDescending(g => g.Count).ThenBy(g => g.Text, StringComparer.OrdinalIgnoreCase))
+        {
+            g.IsExpanded = expanded.Contains(g.Key);
+            Groups.Add(g);
+        }
     }
 
     private void UpdateSummary()
@@ -180,6 +196,41 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand] private void RejectAll() { foreach (var f in Findings) f.Accepted = false; }
 
     public void ToggleFinding(FindingViewModel f) => f.Accepted = !f.Accepted;
+
+    /// <summary>Selects or clears a set of findings at once (drag-selection on the page, group rows).</summary>
+    public void SetAccepted(IEnumerable<FindingViewModel> findings, bool accepted)
+    {
+        foreach (var f in findings.Distinct()) f.Accepted = accepted;
+    }
+
+    /// <summary>Deletes several findings (they will neither be highlighted nor redacted).</summary>
+    public void RemoveFindings(IEnumerable<FindingViewModel> findings)
+    {
+        if (_document == null) return;
+        foreach (var f in findings.Distinct().ToList())
+        {
+            _document.Findings.Remove(f.Model);
+            Findings.Remove(f);
+        }
+        RefreshHighlights();
+    }
+
+    /// <summary>Scrolls the page view to a finding without changing its state.</summary>
+    public void ShowFinding(FindingViewModel f) => ScrollToFindingRequested?.Invoke(f);
+
+    [RelayCommand]
+    private void RemoveGroup(FindingGroupViewModel? g)
+    {
+        if (g == null) return;
+        RemoveFindings(g.Items);
+    }
+
+    [RelayCommand]
+    private void AlwaysRedactGroup(FindingGroupViewModel? g)
+    {
+        if (g == null) return;
+        AddTermInternal(g.Text.Trim(), rescan: true);
+    }
 
     [RelayCommand]
     private void RemoveFinding(FindingViewModel? f)
