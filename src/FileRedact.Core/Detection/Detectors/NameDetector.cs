@@ -103,8 +103,12 @@ public sealed class NameDetector : IPiiDetector
             foreach (Match t in tokens)
             {
                 var v = t.Value.TrimEnd('.');
-                if (v.Length < 3 || !IsCapitalised(v) || IsStop(v)) continue;
-                if (!context.KnownNameTokens.Contains(v)) continue;
+                // "Johnson's" / "JOHNSON’S" -> compare the base word, but redact the whole token.
+                var baseWord = v;
+                if (baseWord.EndsWith("'s", StringComparison.OrdinalIgnoreCase) || baseWord.EndsWith("’s", StringComparison.OrdinalIgnoreCase))
+                    baseWord = baseWord[..^2];
+                if (baseWord.Length < 3 || !IsCapitalised(baseWord) || IsStop(baseWord)) continue;
+                if (!context.KnownNameTokens.Contains(baseWord)) continue;
                 results.Add(new TextSpan(t.Index, v.Length, PiiCategory.Name, 0.7, "Matches part of a name found elsewhere in the document"));
             }
         }

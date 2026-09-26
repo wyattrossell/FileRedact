@@ -43,7 +43,11 @@ public partial class MainViewModel : ObservableObject
     public event Action<FindingViewModel>? ScrollToFindingRequested;
 
     [ObservableProperty] private string _status = "Open a document, or print to the FileRedact printer.";
-    [ObservableProperty] private bool _isBusy;
+    // Save/Print are enabled only when a document is loaded and nothing is running; re-evaluate whenever IsBusy flips.
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveRedactedCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PrintCommand))]
+    private bool _isBusy;
     [ObservableProperty] private string? _documentName;
     [ObservableProperty] private string? _sourcePath;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ZoomPercent))] private double _zoom = 1.0;
@@ -104,7 +108,10 @@ public partial class MainViewModel : ObservableObject
             var notes = new List<string> { report.ConversionNote };
             if (report.OcrPages > 0) notes.Add($"OCR used on {report.OcrPages} page(s)");
             notes.AddRange(report.Warnings);
-            Status = $"Loaded {doc.Pages.Count} page(s). {findings.Count} potential item(s) found. {string.Join(" · ", notes)}";
+            var selected = findings.Count(f => f.Accepted);
+            Status = findings.Count == 0
+                ? $"Loaded {doc.Pages.Count} page(s). No personal information was detected - drag on the page to redact anything the scan missed, then Save or Print. ({string.Join(" · ", notes)})"
+                : $"Loaded {doc.Pages.Count} page(s). {findings.Count} item(s) found, {selected} pre-selected. Review the highlights, then click Save redacted PDF or Print. ({string.Join(" · ", notes)})";
             LastOutputPath = null;
         }
         catch (Exception ex)
@@ -315,6 +322,11 @@ public partial class MainViewModel : ObservableObject
             SaveSettings();
             LastOutputPath = dlg.FileName;
             Status = $"Saved redacted PDF: {dlg.FileName} ({accepted.Count} item(s) removed)";
+            var open = MessageBox.Show(
+                $"Redacted PDF saved with {accepted.Count} item(s) blacked out:\n{dlg.FileName}\n\nOpen it now to check the result?",
+                "FileRedact - saved", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (open == MessageBoxResult.Yes)
+                Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
