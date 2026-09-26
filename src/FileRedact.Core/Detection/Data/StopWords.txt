@@ -1,0 +1,26 @@
+# Capitalised words that are NOT names even though they look like them. Lower-case, whitespace separated.
+january february march april may june july august september october november december
+jan feb mar apr jun jul aug sep sept oct nov dec
+monday tuesday wednesday thursday friday saturday sunday mon tue tues wed thu thur thurs fri sat sun
+alabama alaska arizona arkansas california colorado connecticut delaware florida georgia hawaii idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri montana nebraska nevada hampshire jersey mexico york carolina dakota ohio oklahoma oregon pennsylvania rhode island tennessee texas utah vermont virginia washington wisconsin wyoming columbia
+the this that these those and or of in on at to for from by with without as is are was were be been being am
+a an it its he she they them his her their our your my we you i who whom whose which what when where why how
+police department dept sheriff office officer officers deputy deputies detective detectives sergeant sgt lieutenant lt captain capt chief trooper agent agents
+county city state states federal united america american national government municipal township village borough parish district precinct division bureau unit section agency
+court courts judge honorable clerk attorney attorneys district public defender prosecutor prosecution defense counsel jury judgment order motion hearing trial docket
+report reports reported reporting incident incidents case cases number no num id date time page pages file record records narrative summary statement statements supplement
+street st avenue ave road rd boulevard blvd lane ln drive dr court ct highway hwy interstate route parkway pkwy way place pl circle cir north south east west
+hospital medical center centre clinic school university college high middle elementary academy bank company inc llc corp corporation ltd co church
+victim suspect subject defendant witness complainant arrestee offender juvenile person persons individual individuals male female adult child
+vehicle car truck van suv motorcycle plate tag license licence registration insurance make model color colour year
+name first last middle address phone email dob ssn age sex race height weight hair eyes
+yes no none unknown n/a na null true false other
+mr mrs ms miss dr prof rev hon sir madam
+monday-friday am pm est cst mst pst edt cdt mdt pdt utc
+january-december total amount description item quantity type status code description location
+signature signed date/time badge dispatch dispatched arrived cleared responded advised stated observed contacted transported
+evidence property drugs narcotics weapon firearm knife alcohol marijuana cocaine methamphetamine heroin fentanyl
+white black hispanic asian indian native american
+apt apartment suite unit building floor room box po
+usa us u.s. fbi ncic ucn sid doj dhs ice atf dea cjis nlets
+ford chevrolet chevy toyota honda nissan dodge jeep gmc hyundai kia subaru volkswagen bmw mercedes audi lexus mazda tesla ram buick cadillac chrysler lincoln

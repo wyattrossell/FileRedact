@@ -1,0 +1,274 @@
+<Window x:Class="FileRedact.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:FileRedact.App.ViewModels"
+        mc:Ignorable="d"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        Title="FileRedact"
+        Width="1280" Height="860" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True" Drop="Window_Drop" DragOver="Window_DragOver"
+        Background="#F9FAFB"
+        d:DataContext="{d:DesignInstance Type=vm:MainViewModel}">
+    <Window.Resources>
+        <CollectionViewSource x:Key="FindingsView" Source="{Binding Findings}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="CategoryName" />
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
+    </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Modifiers="Ctrl" Key="O" Command="{Binding OpenFileCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="S" Command="{Binding SaveRedactedCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="P" Command="{Binding PrintCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="OemPlus" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Add" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="OemMinus" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="Subtract" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Modifiers="Ctrl" Key="D0" Command="{Binding ZoomResetCommand}" />
+    </Window.InputBindings>
+
+    <DockPanel>
+        <!-- Toolbar -->
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Padding="8,6">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Style="{StaticResource ToolButton}" Content="{Binding PrinterButtonText}" Command="{Binding TogglePrinterCommand}"
+                            ToolTip="Adds a 'FileRedact' printer to Windows. Printing to it opens the document here." />
+                    <Button Style="{StaticResource ToolButton}" Content="Help" Click="Help_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource ToolButton}" Content="Open…" Command="{Binding OpenFileCommand}" ToolTip="Open a PDF, Word document, text file or image (Ctrl+O)" />
+                    <Separator Margin="6,0" />
+                    <Button Style="{StaticResource ToolButton}" Content="Select all" Command="{Binding AcceptAllCommand}" ToolTip="Mark every finding for redaction" />
+                    <Button Style="{StaticResource ToolButton}" Content="Clear all" Command="{Binding RejectAllCommand}" ToolTip="Unmark every finding" />
+                    <Separator Margin="6,0" />
+                    <ToggleButton Style="{StaticResource ToolToggle}" Content="Preview redactions" IsChecked="{Binding PreviewRedactions}"
+                                  ToolTip="Show selected items as solid black boxes, exactly as they will appear in the output" />
+                    <Separator Margin="6,0" />
+                    <Button Style="{StaticResource ToolButton}" Content="−" Command="{Binding ZoomOutCommand}" MinWidth="32" />
+                    <Button Style="{StaticResource ToolButton}" Content="{Binding ZoomPercent}" Command="{Binding ZoomResetCommand}" MinWidth="56" ToolTip="Reset zoom" />
+                    <Button Style="{StaticResource ToolButton}" Content="+" Command="{Binding ZoomInCommand}" MinWidth="32" />
+                    <Separator Margin="6,0" />
+                    <Button Style="{StaticResource ToolButton}" Content="Save redacted PDF…" Command="{Binding SaveRedactedCommand}" FontWeight="SemiBold" ToolTip="Write a new PDF with the selected items blacked out (Ctrl+S)" />
+                    <Button Style="{StaticResource ToolButton}" Content="Print…" Command="{Binding PrintCommand}" ToolTip="Print the redacted document (Ctrl+P)" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="10,4">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" Foreground="#374151" Margin="12,0,0,0" VerticalAlignment="Center" />
+                <ProgressBar DockPanel.Dock="Right" Width="120" Height="10" IsIndeterminate="True" Margin="12,0,0,0"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisible}}" VerticalAlignment="Center" />
+                <Button DockPanel.Dock="Right" Content="Show in folder" Command="{Binding OpenOutputFolderCommand}" Padding="8,1" Margin="12,0,0,0"
+                        Visibility="{Binding LastOutputPath, Converter={StaticResource NullToCollapsed}}" />
+                <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" Foreground="#111827" VerticalAlignment="Center" ToolTip="{Binding Status}" />
+            </DockPanel>
+        </Border>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="400" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="360" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Pages -->
+            <ScrollViewer x:Name="PagesScroll" Grid.Column="0" Background="#E5E7EB"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                          ScrollChanged="PagesScroll_ScrollChanged" PreviewMouseWheel="PagesScroll_PreviewMouseWheel" Focusable="True">
+                <Grid>
+                    <!-- Empty state -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="40"
+                                Visibility="{Binding HasDocument, Converter={StaticResource BoolToCollapsed}}">
+                        <TextBlock Text="FileRedact" FontSize="30" FontWeight="SemiBold" Foreground="#374151" HorizontalAlignment="Center" />
+                        <TextBlock Text="Remove personal information before a document leaves your control." FontSize="14" Foreground="#6B7280" Margin="0,4,0,20" HorizontalAlignment="Center" />
+                        <TextBlock Foreground="#4B5563" FontSize="13" TextAlignment="Center" LineHeight="22">
+                            <Run Text="Open a PDF, Word document or image, drop a file here," /><LineBreak />
+                            <Run Text="or print from any program to the &quot;FileRedact&quot; printer." /><LineBreak />
+                            <Run Text="Detected names, dates of birth, SSNs, IDs, addresses and other CJIS PII are highlighted for your review." />
+                        </TextBlock>
+                        <Button Content="Open a document…" Command="{Binding OpenFileCommand}" Padding="16,8" Margin="0,24,0,0" HorizontalAlignment="Center" FontSize="14" />
+                    </StackPanel>
+
+                    <ItemsControl x:Name="PagesHost" ItemsSource="{Binding Pages}" Margin="24,16" HorizontalAlignment="Center">
+                        <ItemsControl.LayoutTransform>
+                            <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
+                        </ItemsControl.LayoutTransform>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:PageViewModel}">
+                                <StackPanel Margin="0,0,0,24" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Header}" Foreground="#6B7280" FontSize="12" Margin="2,0,0,4" />
+                                    <Border BorderBrush="#9CA3AF" BorderThickness="1" Background="White">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.25" />
+                                        </Border.Effect>
+                                        <Grid Width="{Binding PixelWidth}" Height="{Binding PixelHeight}">
+                                            <Image Source="{Binding Image}" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <TextBlock Text="Rendering…" Foreground="#9CA3AF" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Visibility="{Binding Image, Converter={StaticResource NotNullToCollapsed}}" />
+                                            <Canvas Background="Transparent" Tag="{Binding}" ClipToBounds="True"
+                                                    MouseLeftButtonDown="Page_MouseLeftButtonDown" MouseMove="Page_MouseMove"
+                                                    MouseLeftButtonUp="Page_MouseLeftButtonUp" MouseRightButtonUp="Page_MouseRightButtonUp"
+                                                    Cursor="Cross">
+                                                <ItemsControl ItemsSource="{Binding Highlights}" Width="{Binding PixelWidth}" Height="{Binding PixelHeight}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <Canvas />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemContainerStyle>
+                                                        <Style TargetType="ContentPresenter">
+                                                            <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                                            <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                                        </Style>
+                                                    </ItemsControl.ItemContainerStyle>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type vm:HighlightViewModel}">
+                                                            <Rectangle Width="{Binding Width}" Height="{Binding Height}" Style="{StaticResource HighlightStyle}" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Canvas>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </ScrollViewer>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#E5E7EB" />
+
+            <!-- Review panel -->
+            <Grid Grid.Column="2" Background="White">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="12,10,12,0">
+                    <TextBlock Text="{Binding DocumentName, FallbackValue='No document'}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding SourcePath}" />
+                    <TextBlock Text="Tick the items to black out. Click a highlight on the page to toggle it; drag on the page to redact an area." Foreground="#6B7280" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <Expander Grid.Row="1" Header="Categories" IsExpanded="True" Margin="12,8,12,0">
+                    <ItemsControl ItemsSource="{Binding Categories}" Margin="4,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:CategoryGroupViewModel}">
+                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsThreeState="False" Margin="0,2"
+                                          Visibility="{Binding Count, Converter={StaticResource NullToCollapsed}}">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+
+                <Expander Grid.Row="2" Header="Always redact these terms" IsExpanded="True" Margin="12,8,12,0"
+                          ToolTip="Words or numbers to redact in this and every future document (e.g. a specific name or case number).">
+                    <StackPanel Margin="4,4,0,0">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCustomTermCommand}" Padding="10,2" Margin="4,0,0,0" />
+                            <TextBox Text="{Binding CustomTermInput, UpdateSourceTrigger=PropertyChanged}" KeyDown="CustomTerm_KeyDown" />
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding CustomTerms}" Margin="0,4,0,0" MaxHeight="110">
+                            <ItemsControl.Template>
+                                <ControlTemplate TargetType="ItemsControl">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,1">
+                                        <Button DockPanel.Dock="Right" Content="✕" Padding="4,0" FontSize="10" BorderThickness="0" Background="Transparent"
+                                                Command="{Binding DataContext.RemoveCustomTermCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="Remove term" />
+                                        <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Expander>
+
+                <DockPanel Grid.Row="3" Margin="12,8,12,0">
+                    <TextBlock DockPanel.Dock="Top" Text="Findings" Style="{StaticResource SectionHeader}" Margin="0,0,0,4" />
+                    <ListBox x:Name="FindingsList" ItemsSource="{Binding Source={StaticResource FindingsView}}" SelectedItem="{Binding SelectedFinding}"
+                             BorderBrush="#E5E7EB" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.IsVirtualizingWhenGrouping="True">
+                        <ListBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#F3F4F6" Padding="6,3" Margin="0,4,0,2">
+                                            <TextBlock FontWeight="SemiBold" Foreground="#374151">
+                                                <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" (" /><Run Text="{Binding ItemCount, Mode=OneWay}" /><Run Text=")" />
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListBox.GroupStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:FindingViewModel}">
+                                <DockPanel ToolTip="{Binding ToolTip}">
+                                    <DockPanel.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Redact all occurrences of this text"
+                                                      Command="{Binding PlacementTarget.Tag.RedactAllOccurrencesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" />
+                                            <MenuItem Header="Remove this finding"
+                                                      Command="{Binding PlacementTarget.Tag.RemoveFindingCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" />
+                                        </ContextMenu>
+                                    </DockPanel.ContextMenu>
+                                    <CheckBox IsChecked="{Binding Accepted}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <Border DockPanel.Dock="Left" Width="4" Margin="0,2,6,2" CornerRadius="2" Background="{Binding Category, Converter={StaticResource CategoryBrush}}" />
+                                    <TextBlock DockPanel.Dock="Right" Foreground="#6B7280" FontSize="11" VerticalAlignment="Center" Margin="6,0,0,0">
+                                        <Run Text="p." /><Run Text="{Binding Page, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="4,2" />
+                                <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+                </DockPanel>
+
+                <Expander Grid.Row="4" Header="Output options" Margin="12,8,12,10">
+                    <StackPanel Margin="4,4,0,0">
+                        <CheckBox Content="Keep searchable text for the words that remain" IsChecked="{Binding KeepTextLayer}"
+                                  ToolTip="Adds an invisible text layer with the non-redacted words so the PDF stays searchable and AI tools can read it without OCR. Redacted words are never written." />
+                        <DockPanel Margin="0,6,0,0">
+                            <TextBlock Text="Output resolution (DPI):" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox ItemsSource="{Binding DpiChoices}" SelectedItem="{Binding OutputDpi}" Width="80" HorizontalAlignment="Left" />
+                        </DockPanel>
+                        <TextBlock Text="Pages are rebuilt as images with the black boxes burned in, so redacted content cannot be recovered from the file." Foreground="#6B7280" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Expander>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>
