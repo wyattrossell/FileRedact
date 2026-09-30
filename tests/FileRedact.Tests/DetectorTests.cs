@@ -64,6 +64,51 @@ public class DetectorTests
         Assert.Contains(r, x => x.Text == expected);
     }
 
+    [Fact]
+    public void Address_detector_does_not_throw_on_legal_citations()
+    {
+        // The compiled regex engine threw IndexOutOfRangeException on this text, so documents citing case law failed to open.
+        var ex = Record.Exception(() => Run(new AddressDetector(), "Plumhoff v. Rickard,\n134 S. Ct. 2012 and Mullenix v. Luna"));
+        Assert.Null(ex);
+    }
+
+    // Text as it comes out of a Kentucky uniform citation: cells of the form end up on consecutive lines.
+    [Theory]
+    [InlineData("I was in the area of 61 and Summit drive when i observed the listed vehicle")]
+    [InlineData("TIME OF ARREST\n\n1:30 PM\n\n2026\n\nBULLITT\n\nCOURT TIME")]
+    [InlineData("26\n\nCITY\nPIONEER VILLAGE\n\nEVIDENCE HELD")]
+    [InlineData("20\n2007\nPLACE OF EMPLOYMENT / OCCUPATION")]
+    [InlineData("takes about 25 minutes. Your participation is voluntary")]
+    public void Address_is_not_detected_across_form_cells_or_in_prose(string text)
+    {
+        Assert.Empty(Run(new AddressDetector(), text));
+    }
+
+    [Theory]
+    [InlineData("REGISTRATION: STATE, YEAR, NUMBER\nY5C400\n2027", "Y5C400")]
+    [InlineData("Registration: KY 2027 Y5C400", "Y5C400")]
+    public void License_plate_is_detected_after_form_sub_labels(string text, string expected)
+    {
+        Assert.Contains(Run(new VehicleDetector(), text), x => x.Text == expected && x.Category == PiiCategory.VehicleIdentifier);
+    }
+
+    [Theory]
+    [InlineData("Charge 1: NO REGISTRATION PLATES\nCharge 2: NO REGISTRATION RECEIPT")]
+    [InlineData("Charge 3: REAR LICENSE NOT ILLUMINATED")]
+    [InlineData("the listed vehicle with no rear license plate lights")]
+    public void License_plate_label_followed_by_words_is_ignored(string text)
+    {
+        Assert.Empty(Run(new VehicleDetector(), text));
+    }
+
+    [Theory]
+    [InlineData("BADGE/I.D. NUMBER\n5055", "5055")]
+    [InlineData("Badge #1234", "1234")]
+    public void Badge_number_is_detected(string text, string expected)
+    {
+        Assert.Contains(Run(new CriminalJusticeIdDetector(), text), x => x.Text == expected && x.Category == PiiCategory.CriminalJusticeIdentifier);
+    }
+
     [Theory]
     [InlineData("DL# S123-4567-8901 (IL)", "S123-4567-8901")]
     [InlineData("Driver's License Number: A1234567", "A1234567")]
@@ -104,17 +149,24 @@ public class DetectorTests
     [InlineData("statement of Mr. O'Brien regarding", "O'Brien")]
     [InlineData("Victim Robert Johnson stated", "Robert Johnson")]
     [InlineData("was interviewed. Jennifer Walsh confirmed", "Jennifer Walsh")]
+    // Citation forms: two-word surname with a "NONE" middle-name filler, and a signature with only an initial.
+    [InlineData("NAME: LAST, FIRST, MI, FILIAL\nFONTE PAREDES, YASUAN NONE\nALIAS NAME:", "FONTE PAREDES, YASUAN")]
+    [InlineData("WITNESS SMITH, JOHN A", "SMITH, JOHN A")]
+    [InlineData("OFFICER SIGNATURE\nRichardson, D.\n\nMILES DIRECTION", "Richardson, D.")]
     public void Names_are_detected(string text, string expected)
     {
         var r = Run(new NameDetector(), text);
         Assert.Contains(r, x => x.Text == expected && x.Category == PiiCategory.Name);
     }
 
-    [Fact]
-    public void Common_capitalised_phrases_are_not_names()
+    [Theory]
+    [InlineData("The Springfield Police Department responded on Monday March 3 to Main Street.")]
+    [InlineData("WITNESS 2 NAME: LAST, FIRST, MI, FILIAL")]
+    [InlineData("MILES DIRECTION")]
+    [InlineData("Charge 4: NO OPERATORS-MOPED LICENSE")]
+    public void Common_capitalised_phrases_and_form_headings_are_not_names(string text)
     {
-        var r = Run(new NameDetector(), "The Springfield Police Department responded on Monday March 3 to Main Street.");
-        Assert.Empty(r);
+        Assert.Empty(Run(new NameDetector(), text));
     }
 
     [Fact]

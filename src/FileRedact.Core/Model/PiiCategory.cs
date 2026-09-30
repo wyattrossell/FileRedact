@@ -22,6 +22,10 @@ public enum PiiCategory
     PlaceOfBirth,
     MaidenName,
     IpAddress,
+    /// <summary>Social-media user names and handles ("bigmoney502__", "cole.2943").</summary>
+    OnlineHandle,
+    /// <summary>Web links, which often embed account names, media IDs or a person's name.</summary>
+    WebAddress,
     CustomTerm,
     Manual,
 }
@@ -45,6 +49,8 @@ public static class PiiCategoryInfo
         PiiCategory.PlaceOfBirth => "Place of birth",
         PiiCategory.MaidenName => "Mother's maiden name",
         PiiCategory.IpAddress => "IP address",
+        PiiCategory.OnlineHandle => "Username / online handle",
+        PiiCategory.WebAddress => "Web link",
         PiiCategory.CustomTerm => "Custom term",
         PiiCategory.Manual => "Manual selection",
         _ => c.ToString(),

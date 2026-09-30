@@ -1,0 +1,11 @@
+# Given names that are also everyday English words. They are still names when capitalised and followed by a
+# surname ("Chase Snow"), but on their own or in lower case ("the chase", "will", "mark") they are words.
+chase will mark grant bill rose may june april august hope faith joy jack rich art don sue pat gene frank ray bob jay guy
+lance miles wade van chip chuck dawn holly ivy lily penny bud cliff dean earl gale glen hunter lane marshall max pearl
+reed rod rusty sonny spike stone summer tanner victor sunny autumn amber crystal daisy destiny ember hazel heaven
+iris jade jasmine jewel melody misty olive opal patience precious raven robin ruby sage savannah sky skye star
+tiffany violet willow bailey blake brandy brooke carol cherry ginger honey candy kitty sandy sterling wolf
+ward west north south east king knight bishop pope duke prince major minor young old brown green white black gray grey
+bell berry bush cook carpenter dyer fisher forest ford fox hill lake mason page park parks rivers stone wells wood woods
+# Chat shorthand that is also a name: "yu" (you), "ian" (I ain't), "ima", "bo", "rey".
+yu ian ima ina bo rey mane ping yea yur yep nah do min

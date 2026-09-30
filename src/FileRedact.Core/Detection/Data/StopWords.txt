@@ -24,3 +24,13 @@ white black hispanic asian indian native american
 apt apartment suite unit building floor room box po
 usa us u.s. fbi ncic ucn sid doj dhs ice atf dea cjis nlets
 ford chevrolet chevy toyota honda nissan dodge jeep gmc hyundai kia subaru volkswagen bmw mercedes audi lexus mazda tesla ram buick cadillac chrysler lincoln
+# Column headings and name-field fillers found on citation / booking forms ("NAME: LAST, FIRST, MI, FILIAL", "MILES DIRECTION").
+mi nmn filial initial initials jr sr now therefore direction origin results identifiers extension involvement relationship resident employment occupation assignment complaint citation violation warrant warrants sector zone control ethnic marital hazardous commercial placarded payable prepayable held uniform commonwealth
+# KYIBRS / NIBRS incident-report headings and section labels.
+kyibrs nibrs data seq sequence suspected applied appled armed zip offense offenses supplement narrative synopsis investigation arrestee residence premises entry method weapon force bias motivation gang activity campus counts degree class code statute recovered recvrd cond seized stolen forfeiture pending general firearm firearms caliber action finish descriptors owner serial make model quantity measurement drug drugs marijuana suppression narcotic equipment paraphernalia arrow bow gun rifle excluding listed latitude longitude deg min lbs oz
+# Words that start a sentence right after a name and get swept into it.
+also within during but however after before while when then once upon prior per via additionally further later next actions
+everyone nobody someone somebody everybody anyone anybody funds aid grant grants policy policies procedure procedures
+# Platforms, tools and agency shorthand seen in narratives.
+instagram insta snapchat snap facebook tiktok twitter telegram discord messenger meta platforms business record page author body sent share url type size attachments product linked media file unknown enabled read receipts current participants timestamp selected search call missed duration utc created text
+miranda warning rights narcan ems csu lmpd hpd ksp rcfl nibin kyops cellbrite cellebrite berla clear glock taurus ruger motorola samsung iphone android walmart chrome google verizon mobile sprint kia forte muha meds vape thc fire scene crime metro squad dispatch

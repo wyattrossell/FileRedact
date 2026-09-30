@@ -55,6 +55,14 @@ icacls $Inbox /grant '*S-1-5-32-545:(OI)(CI)M' /grant '*S-1-5-18:(OI)(CI)F' /T |
 if (Test-Path $port) { Remove-Item -Force $port }
 
 if (-not (Get-PrinterDriver -Name $driver -ErrorAction SilentlyContinue)) {
+    # The driver ships with Windows but can be switched off; turn the optional feature back on (offline, no reboot).
+    try {
+        Enable-WindowsOptionalFeature -Online -FeatureName 'Printing-PrintToPDFServices-Features' -All -NoRestart | Out-Null
+    } catch {
+        Write-Warning "Could not enable the 'Microsoft Print to PDF' feature: $($_.Exception.Message)"
+    }
+}
+if (-not (Get-PrinterDriver -Name $driver -ErrorAction SilentlyContinue)) {
     Write-Error "The '$driver' driver is not installed. Enable the 'Microsoft Print to PDF' Windows feature and try again."
     exit 2
 }

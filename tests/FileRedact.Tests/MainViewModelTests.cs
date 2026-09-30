@@ -77,7 +77,8 @@ public class MainViewModelTests
         Assert.Contains(vm.Findings, f => f.Text.StartsWith("55 Pine Court") && f.Category == PiiCategory.Address);
         Assert.Contains(vm.Findings, f => f.Text == "309-555-0100");
         Assert.Contains(vm.Findings, f => f.Text == "Daniel Chen");
-        Assert.Contains(vm.Findings, f => f.Text == "Alvarez" && f.Reason.StartsWith("Matches part"));
+        // The standalone surname is found either by propagation or because it precedes "was advised".
+        Assert.Contains(vm.Findings, f => f.Text == "Alvarez" && f.Accepted && f.Model.TextStart > 100);
         Assert.Contains(vm.Categories, c => c.Category == PiiCategory.Name && c.Count >= 2);
         Assert.Contains("Save redacted PDF", vm.Status);
         File.Delete(sample);

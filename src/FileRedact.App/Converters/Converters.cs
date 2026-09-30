@@ -26,6 +26,8 @@ public sealed class CategoryToBrushConverter : IValueConverter
         [PiiCategory.PlaceOfBirth] = Make("#7C3AED"),
         [PiiCategory.MaidenName] = Make("#2563EB"),
         [PiiCategory.IpAddress] = Make("#6B7280"),
+        [PiiCategory.OnlineHandle] = Make("#0D9488"),
+        [PiiCategory.WebAddress] = Make("#4B5563"),
         [PiiCategory.CustomTerm] = Make("#D97706"),
         [PiiCategory.Manual] = Make("#111827"),
     };

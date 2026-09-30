@@ -36,7 +36,8 @@ public sealed class DateDetector : IPiiDetector
     private const string Months = @"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
     private static readonly Regex[] Patterns =
     {
-        new(@"(?<![\d/])(?:0?[1-9]|1[0-2])[/\-.](?:0?[1-9]|[12]\d|3[01])[/\-.](?:19|20)\d{2}(?![\d/])", Default),
+        // The year may wrap onto the next line in a narrative: "(DOB 12-22-\n2001)".
+        new(@"(?<![\d/])(?:0?[1-9]|1[0-2])[/\-.](?:0?[1-9]|[12]\d|3[01])[/\-.][ \t]*(?:\r?\n[ \t]*)?(?:19|20)\d{2}(?![\d/])", Default),
         new(@"(?<![\d/])(?:0?[1-9]|1[0-2])[/\-.](?:0?[1-9]|[12]\d|3[01])[/\-.]\d{2}(?![\d/])", Default),
         new(@"(?<![\d/])(?:19|20)\d{2}[/\-.](?:0?[1-9]|1[0-2])[/\-.](?:0?[1-9]|[12]\d|3[01])(?![\d/])", Default),
         new(@"\b" + Months + @"\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+(?:19|20)\d{2}\b", IgnoreCase),
@@ -63,7 +64,8 @@ public sealed class DateDetector : IPiiDetector
 
 public sealed class PhoneDetector : IPiiDetector
 {
-    private static readonly Regex Phone = new(@"(?<![\d-])(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?!\d)", Default);
+    // A number wrapped at a line end ("502-\n340-0773", "502-664\n-3039") is still one number.
+    private static readonly Regex Phone = new(@"(?<![\d-])(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}(?:[.\-][ \t]*(?:\r?\n[ \t]*)?|\s))\d{3}(?:[ \t]*(?:\r?\n[ \t]*)?[.\-][ \t]*|\s)\d{4}(?!\d)", Default);
     private static readonly Regex Plain10 = new(@"(?<!\d)[2-9]\d{9}(?!\d)", Default);
     private static readonly Regex Context = new(@"\b(?:phone|tel(?:ephone)?|cell|mobile|fax|ph|contact|call|home|work|pager|number|no\.?|#)(?![A-Za-z])", IgnoreCase);
 
@@ -77,6 +79,9 @@ public sealed class PhoneDetector : IPiiDetector
         {
             if (HasContextBefore(text, m.Index, Context, 30))
                 yield return new TextSpan(m.Index, m.Length, PiiCategory.PhoneNumber, 0.7, "10 digits following a phone label");
+            // "5024924699" typed into a chat: no label, but the area code is one already seen in this document.
+            else if (context.KnownAreaCodes.Contains(m.Value[..3]))
+                yield return new TextSpan(m.Index, m.Length, PiiCategory.PhoneNumber, 0.7, "10 digits with an area code found elsewhere in the document");
         }
     }
 }
@@ -94,15 +99,34 @@ public sealed class EmailDetector : IPiiDetector
 
 public sealed class AddressDetector : IPiiDetector
 {
-    private const string States = @"(?:A[LKZR]|C[AOT]|D[EC]|FL|GA|HI|I[DLNA]|K[SY]|LA|M[EDAINSOT]|N[EVHJMYCD]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[TA]|W[AVIY])";
-    private const string Suffix = @"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Circle|Cir|Way|Place|Pl|Terrace|Ter|Highway|Hwy|Parkway|Pkwy|Trail|Trl|Loop|Run|Pike|Route|Rte|Square|Sq|Alley|Aly|Crossing|Xing|Path|Point|Pt|Ridge|Rdg|Row|Bend|Cove|Cv|Creek|Crk|Hill|Hls|Park|Plaza|Plz|Turnpike|Tpke|Expressway|Expy|Freeway|Fwy|Landing|Lndg|Manor|Mnr|Meadows|Mdws|Station|Sta|Valley|Vly|View|Vw|Village|Vlg|Walk|Estates|Ests|Heights|Hts|Gardens|Gdns|Grove|Grv|Harbor|Hbr|Island|Is|Junction|Jct|Lake|Lk|Mount|Mt|Orchard|Orch|Pass|Ranch|Rnch|Shore|Shr|Spring|Spg|Springs|Spgs|Summit|Smt|Trace|Trce|Vista|Vis)";
-    private const string Unit = @"(?:\s*,?\s*(?:Apt|Apartment|Unit|Suite|Ste|Bldg|Building|Floor|Fl|Rm|Room|Lot|Space|Spc|#)\.?\s*[A-Za-z0-9\-]+)?";
-    private const string CityStateZip = @"(?:\s*,?\s*(?:\r?\n)?\s*[A-Za-z][A-Za-z.'\-]+(?:\s+[A-Za-z][A-Za-z.'\-]+){0,3}\s*,?\s+" + States + @"\.?\s+\d{5}(?:-\d{4})?)?";
+    internal const string States = @"(?:A[LKZR]|C[AOT]|D[EC]|FL|GA|HI|I[DLNA]|K[SY]|LA|M[EDAINSOT]|N[EVHJMYCD]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[TA]|W[AVIY])";
+    internal const string Suffix = @"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Circle|Cir|Way|Place|Pl|Terrace|Ter|Highway|Hwy|Parkway|Pkwy|Trail|Trl|Loop|Run|Pike|Route|Rte|Square|Sq|Alley|Aly|Crossing|Xing|Path|Point|Pt|Ridge|Rdg|Row|Bend|Cove|Cv|Creek|Crk|Hill|Hls|Park|Plaza|Plz|Turnpike|Tpke|Expressway|Expy|Freeway|Fwy|Landing|Lndg|Manor|Mnr|Meadows|Mdws|Station|Sta|Valley|Vly|View|Vw|Village|Vlg|Walk|Estates|Ests|Heights|Hts|Gardens|Gdns|Grove|Grv|Harbor|Hbr|Island|Junction|Jct|Lake|Lk|Mount|Mt|Orchard|Orch|Pass|Ranch|Rnch|Shore|Shr|Spring|Spg|Springs|Spgs|Summit|Smt|Trace|Trce|Vista|Vis)";
+    // Words that are never part of a street name; without this "61 and Summit Drive" in a narrative is an address.
+    private const string NotStreetWord = @"(?!(?:and|or|of|the|at|to|in|on|for|from|by|with|is|was|are|were|a|an)[ \t])";
+    private const string Unit = @"(?:[ \t]*,?[ \t]*(?:Apt|Apartment|Unit|Suite|Ste|Bldg|Building|Floor|Fl|Rm|Room|Lot|Space|Spc|#)\.?(?![A-Za-z])[ \t]*[A-Za-z0-9\-]+)?";
+    private const string CityStateZip = @"(?:[ \t]*,?[ \t]*(?:\r?\n)?[ \t]*[A-Za-z][A-Za-z.'\-]+(?:[ \t]+[A-Za-z][A-Za-z.'\-]+){0,3}[ \t]*,?[ \t]+" + States + @"\.?[ \t]+\d{5}(?:-\d{4})?)?";
 
+    // The number and street stay on one line ([ \t] rather than \s): on boxed forms the reading-order text puts
+    // unrelated cells on consecutive lines, and "1:30 PM\n\n2026\n\nBULLITT\n\nCOURT" must not become an address.
+    // A time such as "1:30" is not a house number either.
+    // Deliberately not RegexOptions.Compiled: the .NET compiled engine throws IndexOutOfRangeException on this
+    // pattern for inputs such as "134 S. Ct. 2012 and Mullenix", which made whole documents fail to open.
+    // The interpreter handles the same input correctly.
+    // A narrative may wrap the address before the street type ("797 Hillview\nBoulevard", "13627 Faye Amick\nRd");
+    // that is allowed only when the street name is made of words, so form cells ("20 2007\nPLACE") stay apart.
     private static readonly Regex Street = new(
-        @"(?<![\w/])\d{1,6}[A-Za-z]?\s+(?:(?:N|S|E|W|NE|NW|SE|SW|North|South|East|West)\.?\s+)?(?:[A-Za-z0-9'.\-]+\s+){1,4}?" + Suffix + @"\b\.?(?:\s+(?:N|S|E|W|NE|NW|SE|SW))?\b" + Unit + CityStateZip,
-        IgnoreCase | RegexOptions.ExplicitCapture);
+        @"(?<![\w/])(?<!\d:)\d{1,6}[A-Za-z]?[ \t]+(?:(?:N|S|E|W|NE|NW|SE|SW|North|South|East|West)\.?[ \t]+)?(?:(?:" + NotStreetWord + @"[A-Za-z0-9'.\-]+[ \t]+){1,4}?|(?:" + NotStreetWord + @"[A-Za-z][A-Za-z'\-]*[ \t]+){0,3}" + NotStreetWord + @"[A-Za-z][A-Za-z'\-]*[ \t]*\r?\n[ \t]*)" + Suffix + @"\b\.?(?:[ \t]+(?:N|S|E|W|NE|NW|SE|SW))?\b" + Unit + CityStateZip,
+        (IgnoreCase & ~RegexOptions.Compiled) | RegexOptions.ExplicitCapture);
     private static readonly Regex PoBox = new(@"\bP\.?\s?O\.?\s?Box\s+\d+" + CityStateZip, IgnoreCase | RegexOptions.ExplicitCapture);
+    // "the residence at 111 Norwood", "lives at 4517 Greymont": a number and a capitalised street name with no
+    // street-type word, trusted only when a location phrase introduces it.
+    private static readonly Regex LocatedAt = new(
+        @"\b(?:at|located\s+at|residence\s+(?:at|of)|address\s+(?:at|of|is|for)|lives?\s+(?:at|on)|residing\s+at|resides\s+at|in\s+front\s+of|to)\s+(?<addr>\d{1,6}[A-Za-z]?\s+(?:(?:N|S|E|W|NE|NW|SE|SW|North|South|East|West)\.?\s+)?[A-Z][A-Za-z'\-]{2,}(?:\s+[A-Z][A-Za-z'\-]{2,}){0,2})(?![A-Za-z0-9])",
+        Default | RegexOptions.ExplicitCapture);
+    // Chat spelling with the street type glued on: "831 hillviewblvd".
+    private static readonly Regex Glued = new(
+        @"(?<![\w/])(?<!\d:)\d{1,6}[ \t]+[A-Za-z]{4,}(?:blvd|boulevard|street|avenue|road|drive|lane|court|ave|hwy|pkwy|pike|trail|circle)\b",
+        IgnoreCase);
     private static readonly Regex CityLine = new(@"\b[A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){0,3}\s*,\s*" + States + @"\.?\s+\d{5}(?:-\d{4})?\b", Default | RegexOptions.ExplicitCapture);
     private static readonly Regex Context = new(@"\b(?:address|addr|residence|resides|residing|lives\s+at|home|located\s+at|location|street)\b", IgnoreCase);
 
@@ -120,6 +144,20 @@ public sealed class AddressDetector : IPiiDetector
         {
             var (s, l) = Trim(text, m.Index, m.Length);
             yield return new TextSpan(s, l, PiiCategory.Address, 0.9, "PO Box");
+        }
+        foreach (Match m in LocatedAt.Matches(text))
+        {
+            var g = m.Groups["addr"];
+            // "at 0304 hours", "at 2:30 am": a time or count, not a house number.
+            var word = g.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).First();
+            if (Regex.IsMatch(word, @"^(?:hours|hrs|am|pm|minutes|seconds|feet|ft|miles|percent|dollars|degrees|deg|min|seconds|shots|rounds|people|days|years|months)$", RegexOptions.IgnoreCase)) continue;
+            var (s, l) = Trim(text, g.Index, g.Length);
+            yield return new TextSpan(s, l, PiiCategory.Address, 0.7, "Number and street name after a location phrase");
+        }
+        foreach (Match m in Glued.Matches(text))
+        {
+            var (s, l) = Trim(text, m.Index, m.Length);
+            yield return new TextSpan(s, l, PiiCategory.Address, 0.75, "Street address (street type written as one word)");
         }
         foreach (Match m in CityLine.Matches(text))
         {
@@ -156,16 +194,19 @@ public sealed class DriverLicenseDetector : IPiiDetector
 
 internal static class IdHelpers
 {
-    /// <summary>Drops leading/trailing space-separated tokens that contain no digit ("12345678 STATE TX" -> "12345678").</summary>
+    /// <summary>
+    /// Keeps the first run of space-separated tokens that contain a digit ("12345678 STATE TX" -> "12345678",
+    /// "B95674861 DOB 04" -> "B95674861"): the identifier ends where the next label begins.
+    /// </summary>
     public static (int Start, int Length) TrimAlphaTokens(string text, int start, int length)
     {
         var value = text.Substring(start, length);
         var parts = value.Split(' ');
         var first = 0;
-        var last = parts.Length - 1;
-        while (first <= last && DigitCount(parts[first]) == 0) first++;
-        while (last >= first && DigitCount(parts[last]) == 0) last--;
-        if (first > last) return (start, 0);
+        while (first < parts.Length && DigitCount(parts[first]) == 0) first++;
+        var last = first;
+        while (last + 1 < parts.Length && DigitCount(parts[last + 1]) > 0) last++;
+        if (first >= parts.Length) return (start, 0);
         var offset = parts.Take(first).Sum(p => p.Length + 1);
         var kept = string.Join(' ', parts.Skip(first).Take(last - first + 1));
         return (start + offset, kept.Length);
@@ -217,7 +258,15 @@ public sealed class VehicleDetector : IPiiDetector
 {
     private static readonly Regex Vin = new(@"\b[A-HJ-NPR-Z0-9]{17}\b", Default);
     private static readonly Regex VinContext = new(@"\bVIN\b|vehicle\s+id", IgnoreCase);
-    private static readonly Regex Plate = new(@"\b(?:licen[sc]e\s+plate|plate|tag|LP|LIC|registration)\s*(?:no\.?|number|num\.?|#)?\s*[:#\-]?\s*(?<id>[A-Z0-9]{2,4}[\- ]?[A-Z0-9]{2,4})(?![A-Za-z0-9])", IgnoreCase);
+    // At most one line break between the label and the value, so a value can sit on the next line of a form.
+    private const string Gap = @"[ \t]*(?:\r?\n[ \t]*)?";
+    // A form may print sub-labels, the state and the year between the label and the plate itself:
+    // "REGISTRATION: STATE, YEAR, NUMBER" / "KY 2027 Y5C400". The label must be a whole word ("LIC" is not "LICENSE").
+    private static readonly Regex Plate = new(
+        @"\b(?:licen[sc]e\s+plate|plate|tag|LP|LIC|registration)(?![A-Za-z])" + Gap +
+        @"(?:(?:(?:no\.?|number|num\.?|#|state|st\.?|year|yr\.?|(?:19|20)\d{2}|" + AddressDetector.States + @")(?![A-Za-z0-9])|[:,/\-])" + Gap + @")*" +
+        @"(?<id>[A-Z0-9]{2,4}[\- ]?[A-Z0-9]{2,4})(?![A-Za-z0-9])",
+        IgnoreCase);
 
     public string Name => "Vehicle";
 
@@ -232,9 +281,8 @@ public sealed class VehicleDetector : IPiiDetector
         foreach (Match m in Plate.Matches(text))
         {
             var g = m.Groups["id"];
-            var v = g.Value;
-            if (DigitCount(v) == 0 && v != v.ToUpperInvariant()) continue;
-            if (DigitCount(v) == 0 && v.Length < 5) continue;
+            // Plates carry digits; a word after the label ("REGISTRATION PLATES", "license plate lights") does not.
+            if (DigitCount(g.Value) == 0) continue;
             yield return new TextSpan(g.Index, g.Length, PiiCategory.VehicleIdentifier, 0.85, "License plate following a plate label");
         }
     }
@@ -247,6 +295,11 @@ public sealed class CriminalJusticeIdDetector : IPiiDetector
         @"\b(?:FBI|UCN|SID|SBI|OCA|TCN|DOC|DCN|NCIC|inmate|booking|offender|arrest|jacket|MNI|CCH|state\s+identification)\s*(?:no\.?|number|num\.?|#|id)?\s*[:#\-]?\s*(?<id>[A-Z0-9][A-Z0-9\-]{4,15})(?![A-Za-z0-9])",
         IgnoreCase);
 
+    // Officer badge / ID numbers: "Badge #123", or "BADGE/I.D. NUMBER" with the value on the next line of a form.
+    private static readonly Regex Badge = new(
+        @"\bbadge(?:[ \t]*/[ \t]*|[ \t]+)?(?:I\.?[ \t]?D\.?)?[ \t]*(?:no\.?|number|num\.?|#)?[ \t]*[:#\-]?[ \t]*(?:\r?\n[ \t]*)?(?<id>\d{2,8})(?!\d)",
+        IgnoreCase);
+
     public string Name => "CriminalJusticeId";
 
     public IEnumerable<TextSpan> Detect(string text, DetectionContext context)
@@ -256,6 +309,11 @@ public sealed class CriminalJusticeIdDetector : IPiiDetector
             var g = m.Groups["id"];
             if (DigitCount(g.Value) < 3) continue;
             yield return new TextSpan(g.Index, g.Length, PiiCategory.CriminalJusticeIdentifier, 0.85, "Identifier following a criminal-justice record label");
+        }
+        foreach (Match m in Badge.Matches(text))
+        {
+            var g = m.Groups["id"];
+            yield return new TextSpan(g.Index, g.Length, PiiCategory.CriminalJusticeIdentifier, 0.8, "Badge number following a badge label");
         }
     }
 }

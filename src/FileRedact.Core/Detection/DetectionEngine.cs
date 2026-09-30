@@ -40,9 +40,23 @@ public sealed class DetectionEngine
         new PlaceOfBirthDetector(),
         new MaidenNameDetector(),
         new IpAddressDetector(),
+        new OnlineHandleDetector(),
+        new WebAddressDetector(),
         new NameDetector(),
         new CustomTermDetector(),
     };
+
+    /// <summary>
+    /// Whether a name span is trustworthy enough for its tokens to be searched for throughout the document.
+    /// Confident spans always are; moderately confident ones only when written in mixed case, because the
+    /// weak ALL-CAPS spans are form labels mistaken for names ("OFFENDER SUSPECTED") and would spread across
+    /// every page. A lone given name or a phrase before a verb of action ("Aid Funds received") never seeds.
+    /// </summary>
+    private static bool Propagates(TextSpan s, string text)
+        => s.Confidence >= 0.8
+           || (s.Confidence >= 0.7 && s.Reason != "Known given name" && text.AsSpan(s.Start, s.Length).ContainsAny(Lower));
+
+    private static readonly System.Buffers.SearchValues<char> Lower = System.Buffers.SearchValues.Create("abcdefghijklmnopqrstuvwxyz");
 
     public List<Finding> Detect(RedactDocument doc, DetectionOptions options)
     {
@@ -55,6 +69,8 @@ public sealed class DetectionEngine
             var spans = new List<TextSpan>();
             foreach (var d in _detectors)
                 spans.AddRange(d.Detect(page.Text, ctx));
+            // Boxed forms: values that sit beneath a label and are scattered in the reading-order text.
+            spans.AddRange(FormFieldDetector.Detect(page));
             perPage.Add(spans);
         }
 
@@ -62,18 +78,40 @@ public sealed class DetectionEngine
         if (options.PropagateNames)
         {
             var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var handles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var areaCodes = new HashSet<string>();
             for (var i = 0; i < doc.Pages.Count; i++)
             {
-                foreach (var s in perPage[i].Where(s => s.Category is PiiCategory.Name or PiiCategory.CustomTerm && s.Confidence >= 0.8))
-                    foreach (var t in NameDetector.NameTokens(doc.Pages[i].Text.Substring(s.Start, s.Length)))
+                var text = doc.Pages[i].Text;
+                foreach (var s in perPage[i].Where(s => s.Category is PiiCategory.Name or PiiCategory.CustomTerm && Propagates(s, text)))
+                    foreach (var t in NameDetector.NameTokens(text.Substring(s.Start, s.Length)))
                         tokens.Add(t);
+                // Only handles confirmed by a platform label spread; the shape-based guesses do not.
+                foreach (var s in perPage[i].Where(s => s.Category == PiiCategory.OnlineHandle && s.Confidence >= 0.85))
+                    handles.Add(text.Substring(s.Start, s.Length));
+                foreach (var s in perPage[i].Where(s => s.Category == PiiCategory.PhoneNumber && s.Confidence >= 0.9))
+                {
+                    var digits = new string(text.AsSpan(s.Start, s.Length).ToArray().Where(char.IsDigit).ToArray());
+                    if (digits.Length == 11 && digits[0] == '1') digits = digits[1..];
+                    if (digits.Length == 10) areaCodes.Add(digits[..3]);
+                }
             }
-            if (tokens.Count > 0)
+            if (tokens.Count > 0 || handles.Count > 0 || areaCodes.Count > 0)
             {
                 var nameDetector = new NameDetector();
-                var propCtx = new DetectionContext { CustomTerms = Array.Empty<string>(), KnownNameTokens = tokens };
+                var handleDetector = new OnlineHandleDetector();
+                var phoneDetector = new PhoneDetector();
+                var propCtx = new DetectionContext { CustomTerms = Array.Empty<string>(), KnownNameTokens = tokens, KnownHandles = handles, KnownAreaCodes = areaCodes };
                 for (var i = 0; i < doc.Pages.Count; i++)
-                    perPage[i].AddRange(nameDetector.Detect(doc.Pages[i].Text, propCtx).Where(s => s.Reason.StartsWith("Matches part")));
+                {
+                    var text = doc.Pages[i].Text;
+                    if (tokens.Count > 0)
+                        perPage[i].AddRange(nameDetector.Detect(text, propCtx).Where(s => s.Reason.StartsWith("Matches part") || s.Reason.StartsWith("Probable misspelling")));
+                    if (handles.Count > 0)
+                        perPage[i].AddRange(handleDetector.Detect(text, propCtx).Where(s => s.Reason.StartsWith("Matches a user name") || s.Reason.StartsWith("Sender of")));
+                    if (areaCodes.Count > 0)
+                        perPage[i].AddRange(phoneDetector.Detect(text, propCtx).Where(s => s.Reason.StartsWith("10 digits with an area code")));
+                }
             }
         }
 

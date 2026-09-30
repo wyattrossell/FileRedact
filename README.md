@@ -19,7 +19,8 @@ Print to PDF" works.
   names, dates of birth, Social Security numbers, driver's license / state ID numbers, passport numbers,
   street and PO Box addresses, phone numbers, email addresses, financial account and payment card numbers,
   vehicle identification numbers and plates, criminal-justice identifiers (FBI/UCN, SID, booking, inmate
-  and offender numbers), place of birth, mother's maiden name, IP addresses, plus user-defined terms.
+  and offender numbers, officer badge numbers), place of birth, mother's maiden name, IP addresses,
+  social-media user names and handles, web links, plus user-defined terms.
 - **Review workflow**: findings are highlighted on the rendered pages and listed by category, with
   identical values merged into one row ("Rossell ×50 · 20 pages") whose single checkbox selects or clears
   every occurrence; expand the row to handle occurrences individually. Click highlights to toggle them,
@@ -152,10 +153,27 @@ Key types:
   validated where possible (SSN area/group rules, Luhn check for cards). Identifiers whose format varies
   by state (driver's licenses, FBI/SID numbers) are recognised from a nearby label such as "DL#" or
   "SID:".
-- Names are found from role labels ("Victim:", "Defendant -"), honorifics and ranks ("Mr.", "Det."),
-  the "LAST, FIRST M" layout used on law-enforcement forms, and a gazetteer of common given names
-  followed by capitalised words. Once a name is found, its surname is also flagged wherever it appears
-  in the document. The word lists live in `src/FileRedact.Core/Detection/Data` and can be extended.
+- Boxed forms (citations, booking sheets) print a label in the corner of each cell with the value beneath it,
+  and the value is often scattered in the extracted text (a date of birth in three boxes, "12 | 20 | 2007").
+  A position-based pass (`Detection/FormFieldDetector`) finds label phrases such as "DATE OF BIRTH",
+  "S. S. NUMBER", "ID NUMBER", "HOME PHONE" and "EXACT LOCATION OF VIOLATION" by their word positions and
+  takes the words sitting directly below them when they look like the expected kind of value.
+- Names are found from role labels ("Victim:", "Defendant -", "friend", "identified as"), honorifics
+  and ranks ("Mr.", "Det."), the "LAST, FIRST M" layout used on law-enforcement forms, a gazetteer of
+  common given names followed by capitalised words, an initial and surname ("E. Clark"), and a name
+  before a verb of speech or action ("Haylee Hartman was interviewed", "Mikey told her"). Once a name
+  is found, its parts are also flagged wherever they appear in the document, including in lower case
+  ("cole" in a chat transcript), as probable misspellings one letter away ("Oritz", "Katlyn"), and as
+  the halves of a hyphenated surname split by a line break. The word lists live in
+  `src/FileRedact.Core/Detection/Data` and can be extended: `StopWords.txt` (capitalised words that are
+  never names), `FirstNames.txt` (the gazetteer) and `CommonWordNames.txt` (given names that are also
+  everyday words, never matched in lower case).
+- Social-media exports quoted in a report are covered: user names next to a platform label
+  ("Instagram handle of kuttaosama", "cole.2943 (Instagram: 52256127893)", "jasonlannan20- Fri Dec 13"),
+  tokens shaped like a handle (letters with digits, underscores or dots, e.g. "bigmoney502__"), and
+  web links including the continuation lines a long link wraps onto. A confirmed handle is then found
+  wherever it recurs. A bare 10-digit number is offered as a phone number when its area code matches a
+  phone number found elsewhere in the document.
 - Dates without a date-of-birth label and IP addresses are shown but not pre-selected, because in most
   reports they are not PII.
 - Automatic detection is an aid, not a guarantee. Reviewers should read the highlighted document before
